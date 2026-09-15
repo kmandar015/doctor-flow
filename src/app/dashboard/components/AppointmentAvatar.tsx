@@ -1,0 +1,2 @@
+const colors = { peach: "bg-[#ffe7db] text-[#c2663c]", violet: "bg-[#eee7ff] text-[#7152bc]", blue: "bg-[#dceeff] text-[#3673a8]", green: "bg-[#dff2e8] text-[#358064]" };
+export function AppointmentAvatar({ initials, color, size = "md" }: { initials: string; color: keyof typeof colors; size?: "sm" | "md" }) { return <span className={`grid shrink-0 place-items-center rounded-full font-bold ${size === "sm" ? "h-9 w-9 text-xs" : "h-11 w-11 text-sm"} ${colors[color]}`}>{initials}</span>; }

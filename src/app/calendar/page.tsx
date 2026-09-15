@@ -1,0 +1,2 @@
+import { CalendarClient } from "./components/CalendarClient";
+export default function CalendarPage() { return <main className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8 lg:px-10"><div className="pt-8 md:pt-0"><p className="text-sm font-medium text-brand">Schedule</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-800">Calendar</h1><p className="mt-2 text-sm text-slate-400">See your availability and upcoming consultations.</p></div><CalendarClient /></main>; }
