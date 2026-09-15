@@ -102,6 +102,9 @@ export function createAppointment(
   doctorId: string,
   input: CreateAppointmentInput,
 ) {
+  if (hasConflict(doctorId, input.appointmentDate, input.appointmentTime)) {
+    throw new Error("CONFLICT");
+  }
   const db = getDatabase();
   const now = new Date().toISOString();
   const existing = db
@@ -152,7 +155,7 @@ export function createAppointment(
 }
 
 const validTransitions: Record<AppointmentStatus, AppointmentStatus[]> = {
-  PENDING: ["CONFIRMED", "REJECTED"],
+  PENDING: ["CONFIRMED", "CANCELLED"],
   CONFIRMED: ["COMPLETED", "CANCELLED"],
   REJECTED: [],
   COMPLETED: [],
@@ -176,6 +179,56 @@ export function updateAppointmentStatus(
       "UPDATE appointments SET status = ?, updated_at = ? WHERE id = ? AND doctor_id = ?",
     )
     .run(nextStatus, new Date().toISOString(), id, doctorId);
+  return {
+    kind: "updated" as const,
+    appointment: getAppointment(doctorId, id)!,
+  };
+}
+
+export function hasConflict(
+  doctorId: string,
+  date: string,
+  time: string,
+  excludeId?: string,
+) {
+  let query =
+    "SELECT id FROM appointments WHERE doctor_id = ? AND appointment_date = ? AND appointment_time = ? AND status != 'CANCELLED'";
+  const params = [doctorId, date, time];
+  if (excludeId) {
+    query += " AND id != ?";
+    params.push(excludeId);
+  }
+  const conflict = getDatabase()
+    .prepare(query)
+    .get(...params);
+  return !!conflict;
+}
+
+export function rescheduleAppointment(
+  doctorId: string,
+  id: string,
+  appointmentDate: string,
+  appointmentTime: string,
+) {
+  const appointment = getAppointment(doctorId, id);
+  if (!appointment) return { kind: "not-found" as const };
+
+  if (hasConflict(doctorId, appointmentDate, appointmentTime, id)) {
+    return { kind: "conflict" as const };
+  }
+
+  getDatabase()
+    .prepare(
+      "UPDATE appointments SET appointment_date = ?, appointment_time = ?, updated_at = ? WHERE id = ? AND doctor_id = ?",
+    )
+    .run(
+      appointmentDate,
+      appointmentTime,
+      new Date().toISOString(),
+      id,
+      doctorId,
+    );
+
   return {
     kind: "updated" as const,
     appointment: getAppointment(doctorId, id)!,

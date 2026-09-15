@@ -94,19 +94,35 @@ export async function POST(request: NextRequest) {
   }
   const text = (value: unknown) =>
     typeof value === "string" ? value.trim() || undefined : undefined;
-  const appointment = createAppointment(getCurrentDoctorId(), {
-    patient: {
-      name: patient.name.trim(),
-      phone: patient.phone.trim(),
-      email: text(patient.email),
-      dateOfBirth: text(patient.dateOfBirth),
-      gender: text(patient.gender),
-    },
-    appointmentDate: input.appointmentDate,
-    appointmentTime: input.appointmentTime,
-    reason: text(input.reason),
-    notes: text(input.notes),
-    source: input.source as AppointmentSource | undefined,
-  });
-  return NextResponse.json({ appointment }, { status: 201 });
+  try {
+    const appointment = createAppointment(getCurrentDoctorId(), {
+      patient: {
+        name: patient.name.trim(),
+        phone: patient.phone.trim(),
+        email: text(patient.email),
+        dateOfBirth: text(patient.dateOfBirth),
+        gender: text(patient.gender),
+      },
+      appointmentDate: input.appointmentDate,
+      appointmentTime: input.appointmentTime,
+      reason: text(input.reason),
+      notes: text(input.notes),
+      source: input.source as AppointmentSource | undefined,
+    });
+    return NextResponse.json({ appointment }, { status: 201 });
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === "CONFLICT") {
+      return NextResponse.json(
+        {
+          error:
+            "This time slot is already booked. Please choose another time.",
+        },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json(
+      { error: "An unexpected error occurred." },
+      { status: 500 },
+    );
+  }
 }

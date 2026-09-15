@@ -223,6 +223,24 @@
             },
             "description": "Expected: 400 — date must be YYYY-MM-DD."
           }
+        },
+        {
+          "name": "Create appointment — 409 Conflict",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": { \"name\": \"Suresh Nair\", \"phone\": \"+91 98800 77654\" },\n  \"appointmentDate\": \"2026-09-20\",\n  \"appointmentTime\": \"11:00\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 409 — Time slot already booked."
+          }
         }
       ]
     },
@@ -242,6 +260,23 @@
             "body": {
               "mode": "raw",
               "raw": "{ \"status\": \"CONFIRMED\" }",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Cancel — PENDING → CANCELLED",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{pendingId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "{{pendingId}}", "status"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"CANCELLED\" }",
               "options": { "raw": { "language": "json" } }
             }
           }
@@ -349,6 +384,47 @@
               "options": { "raw": { "language": "json" } }
             },
             "description": "Expected: 404 — Appointment not found."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reschedule Appointment",
+      "item": [
+        {
+          "name": "Reschedule — success",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{pendingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "{{pendingId}}"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appointmentDate\": \"2026-09-22\",\n  \"appointmentTime\": \"15:00\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Reschedules an appointment to a new date and time."
+          }
+        },
+        {
+          "name": "Reschedule — 409 Conflict",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{pendingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "{{pendingId}}"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appointmentDate\": \"2026-09-20\",\n  \"appointmentTime\": \"11:00\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 409 — Time slot is already booked."
           }
         }
       ]

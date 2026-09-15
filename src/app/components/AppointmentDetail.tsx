@@ -15,7 +15,6 @@ import {
   Tag,
   User,
   X,
-  XCircle,
 } from "lucide-react";
 import type { Appointment, AppointmentStatus } from "@/lib/database/types";
 import { AppointmentAvatar } from "@/app/dashboard/components/AppointmentAvatar";
@@ -48,40 +47,7 @@ const statusBadge: Record<AppointmentStatus, string> = {
 
 // ─── Status action buttons ────────────────────────────────────────────────────
 
-type ActionVariant = "primary" | "danger";
-
-type Action = {
-  label: string;
-  nextStatus: AppointmentStatus;
-  variant: ActionVariant;
-  Icon: React.FC<{ size?: number }>;
-};
-
-const statusActions: Partial<Record<AppointmentStatus, Action[]>> = {
-  PENDING: [
-    {
-      label: "Accept",
-      nextStatus: "CONFIRMED",
-      variant: "primary",
-      Icon: Check,
-    },
-    {
-      label: "Reject",
-      nextStatus: "REJECTED",
-      variant: "danger",
-      Icon: XCircle,
-    },
-  ],
-  CONFIRMED: [
-    {
-      label: "Mark Completed",
-      nextStatus: "COMPLETED",
-      variant: "primary",
-      Icon: CheckCircle,
-    },
-    { label: "Cancel", nextStatus: "CANCELLED", variant: "danger", Icon: Ban },
-  ],
-};
+// (Actions are generated dynamically inside the component)
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -94,8 +60,6 @@ export function AppointmentDetail({
 }) {
   const router = useRouter();
   const { showToast } = useToast();
-  // resolvedId tracks which appointmentId the fetched data belongs to.
-  // loading = appointmentId is set but we haven't resolved a fetch for it yet.
   const [fetchState, setFetchState] = useState<{
     resolvedId: string | null;
     appointment: Appointment | null;
@@ -105,12 +69,21 @@ export function AppointmentDetail({
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
+  const [isCancelling, setIsCancelling] = useState(false);
+
   const { resolvedId, appointment, error: fetchError } = fetchState;
   const loading =
     appointmentId !== null && resolvedId !== appointmentId && !fetchError;
 
-  // Fetch the appointment whenever the ID changes (or the user retries).
-  // Zero synchronous setState calls inside the effect body — only in async callbacks.
+  const handleClose = () => {
+    setIsRescheduling(false);
+    setIsCancelling(false);
+    onClose();
+  };
+
   useEffect(() => {
     let cancelled = false;
 
@@ -132,6 +105,8 @@ export function AppointmentDetail({
           appointment: data,
           error: null,
         });
+        setRescheduleDate(data.appointmentDate);
+        setRescheduleTime(data.appointmentTime);
       })
       .catch((err: Error) => {
         if (cancelled) return;
@@ -148,11 +123,9 @@ export function AppointmentDetail({
     return () => {
       cancelled = true;
     };
-    // retryCount is intentionally included so the user can trigger a retry
   }, [appointmentId, retryCount]);
 
-  // Status transition action
-  const handleAction = (nextStatus: AppointmentStatus) =>
+  const handleStatusChange = (nextStatus: AppointmentStatus) =>
     startTransition(async () => {
       if (!appointment) return;
       setActionError(null);
@@ -173,19 +146,118 @@ export function AppointmentDetail({
       }
       showToast("Appointment status updated successfully.");
       router.refresh();
-      onClose();
+      setIsCancelling(false);
+
+      // Update local state without closing drawer
+      setFetchState((prev) => ({
+        ...prev,
+        appointment: { ...prev.appointment!, status: nextStatus },
+      }));
+    });
+
+  const handleReschedule = () =>
+    startTransition(async () => {
+      if (!appointment) return;
+      setActionError(null);
+      const res = await fetch(`/api/appointments/${appointment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appointmentDate: rescheduleDate,
+          appointmentTime: rescheduleTime,
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        const msg =
+          data?.error ?? "Could not update appointment. Please try again.";
+        setActionError(msg);
+        showToast(msg, "error");
+        return;
+      }
+      showToast("Appointment rescheduled successfully.");
+      router.refresh();
+      setIsRescheduling(false);
+
+      // Update local state
+      setFetchState((prev) => ({
+        ...prev,
+        appointment: {
+          ...prev.appointment!,
+          appointmentDate: rescheduleDate,
+          appointmentTime: rescheduleTime,
+        },
+      }));
     });
 
   if (!appointmentId) return null;
 
-  const actions = appointment ? (statusActions[appointment.status] ?? []) : [];
+  type Action = {
+    label: string;
+    onClick: () => void;
+    variant: "primary" | "danger" | "secondary";
+    Icon: React.FC<{ size?: number }>;
+  };
+
+  const getActions = (): Action[] => {
+    if (!appointment) return [];
+    if (appointment.status === "PENDING") {
+      return [
+        {
+          label: "Confirm",
+          onClick: () => handleStatusChange("CONFIRMED"),
+          variant: "primary",
+          Icon: Check,
+        },
+        {
+          label: "Reschedule",
+          onClick: () => setIsRescheduling(true),
+          variant: "secondary",
+          Icon: Calendar,
+        },
+        {
+          label: "Cancel",
+          onClick: () => setIsCancelling(true),
+          variant: "danger",
+          Icon: Ban,
+        },
+      ];
+    }
+    if (appointment.status === "CONFIRMED") {
+      return [
+        {
+          label: "Complete",
+          onClick: () => handleStatusChange("COMPLETED"),
+          variant: "primary",
+          Icon: CheckCircle,
+        },
+        {
+          label: "Reschedule",
+          onClick: () => setIsRescheduling(true),
+          variant: "secondary",
+          Icon: Calendar,
+        },
+        {
+          label: "Cancel",
+          onClick: () => setIsCancelling(true),
+          variant: "danger",
+          Icon: Ban,
+        },
+      ];
+    }
+    return [];
+  };
+
+  const actions = getActions();
 
   return (
     <>
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-40 bg-slate-950/30"
-        onClick={onClose}
+        onClick={handleClose}
         aria-hidden="true"
       />
 
@@ -198,9 +270,15 @@ export function AppointmentDetail({
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h2 className="font-bold text-slate-800">Appointment Details</h2>
+          <h2 className="font-bold text-slate-800">
+            {isRescheduling
+              ? "Reschedule Appointment"
+              : isCancelling
+                ? "Cancel Appointment"
+                : "Appointment Details"}
+          </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Close"
             className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-100"
           >
@@ -220,8 +298,6 @@ export function AppointmentDetail({
               <p className="text-sm text-slate-500">{fetchError}</p>
               <button
                 onClick={() => {
-                  // Reset resolvedId so loading becomes true, then increment
-                  // retryCount to make the useEffect re-run the fetch.
                   setFetchState({
                     resolvedId: null,
                     appointment: null,
@@ -257,95 +333,141 @@ export function AppointmentDetail({
                 </div>
               </div>
 
-              {/* Patient details */}
-              <section className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Patient
-                </p>
-                <dl className="space-y-2.5">
-                  <DetailRow
-                    icon={<Phone size={14} />}
-                    label="Phone"
-                    value={appointment.patient.phone}
-                  />
-                  {appointment.patient.email && (
-                    <DetailRow
-                      icon={<Mail size={14} />}
-                      label="Email"
-                      value={appointment.patient.email}
-                    />
-                  )}
-                  {appointment.patient.dateOfBirth ? (
-                    <DetailRow
-                      icon={<User size={14} />}
-                      label="Date of birth"
-                      value={`${formatDate(appointment.patient.dateOfBirth)} (${deriveAge(appointment.patient.dateOfBirth)} yrs)`}
-                    />
-                  ) : (
-                    <DetailRow
-                      icon={<User size={14} />}
-                      label="Age"
-                      value="—"
-                    />
-                  )}
-                  {appointment.patient.gender && (
-                    <DetailRow
-                      icon={<User size={14} />}
-                      label="Gender"
-                      value={appointment.patient.gender}
-                    />
-                  )}
-                </dl>
-              </section>
+              {!isRescheduling && !isCancelling && (
+                <>
+                  {/* Patient details */}
+                  <section className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+                      Patient
+                    </p>
+                    <dl className="space-y-2.5">
+                      <DetailRow
+                        icon={<Phone size={14} />}
+                        label="Phone"
+                        value={appointment.patient.phone}
+                      />
+                      {appointment.patient.email && (
+                        <DetailRow
+                          icon={<Mail size={14} />}
+                          label="Email"
+                          value={appointment.patient.email}
+                        />
+                      )}
+                      {appointment.patient.dateOfBirth ? (
+                        <DetailRow
+                          icon={<User size={14} />}
+                          label="Date of birth"
+                          value={`${formatDate(appointment.patient.dateOfBirth)} (${deriveAge(appointment.patient.dateOfBirth)} yrs)`}
+                        />
+                      ) : (
+                        <DetailRow
+                          icon={<User size={14} />}
+                          label="Age"
+                          value="—"
+                        />
+                      )}
+                      {appointment.patient.gender && (
+                        <DetailRow
+                          icon={<User size={14} />}
+                          label="Gender"
+                          value={appointment.patient.gender}
+                        />
+                      )}
+                    </dl>
+                  </section>
 
-              {/* Appointment details */}
-              <section className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Appointment
-                </p>
-                <dl className="space-y-2.5">
-                  <DetailRow
-                    icon={<Calendar size={14} />}
-                    label="Date"
-                    value={formatDate(appointment.appointmentDate)}
-                  />
-                  <DetailRow
-                    icon={<Clock size={14} />}
-                    label="Time"
-                    value={formatTime(appointment.appointmentTime)}
-                  />
-                  {appointment.reason && (
-                    <DetailRow
-                      icon={<Tag size={14} />}
-                      label="Reason"
-                      value={appointment.reason}
+                  {/* Appointment details */}
+                  <section className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+                      Appointment
+                    </p>
+                    <dl className="space-y-2.5">
+                      <DetailRow
+                        icon={<Calendar size={14} />}
+                        label="Date"
+                        value={formatDate(appointment.appointmentDate)}
+                      />
+                      <DetailRow
+                        icon={<Clock size={14} />}
+                        label="Time"
+                        value={formatTime(appointment.appointmentTime)}
+                      />
+                      {appointment.reason && (
+                        <DetailRow
+                          icon={<Tag size={14} />}
+                          label="Reason"
+                          value={appointment.reason}
+                        />
+                      )}
+                      {appointment.notes && (
+                        <DetailRow
+                          icon={<FileText size={14} />}
+                          label="Notes"
+                          value={appointment.notes}
+                        />
+                      )}
+                      <DetailRow
+                        icon={<Tag size={14} />}
+                        label="Source"
+                        value={appointment.source}
+                      />
+                      <DetailRow
+                        icon={<Calendar size={14} />}
+                        label="Created"
+                        value={new Intl.DateTimeFormat("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        }).format(new Date(appointment.createdAt))}
+                      />
+                    </dl>
+                  </section>
+                </>
+              )}
+
+              {isRescheduling && (
+                <div className="mt-6 space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-slate-700">
+                      New Date
+                    </label>
+                    <input
+                      type="date"
+                      value={rescheduleDate}
+                      onChange={(e) => setRescheduleDate(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none focus:border-brand focus:bg-white focus:ring-4 focus:ring-brand/10"
+                      required
                     />
-                  )}
-                  {appointment.notes && (
-                    <DetailRow
-                      icon={<FileText size={14} />}
-                      label="Notes"
-                      value={appointment.notes}
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-slate-700">
+                      New Time
+                    </label>
+                    <input
+                      type="time"
+                      value={rescheduleTime}
+                      onChange={(e) => setRescheduleTime(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none focus:border-brand focus:bg-white focus:ring-4 focus:ring-brand/10"
+                      required
                     />
-                  )}
-                  <DetailRow
-                    icon={<Tag size={14} />}
-                    label="Source"
-                    value={appointment.source}
-                  />
-                  <DetailRow
-                    icon={<Calendar size={14} />}
-                    label="Created"
-                    value={new Intl.DateTimeFormat("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    }).format(new Date(appointment.createdAt))}
-                  />
-                </dl>
-              </section>
+                  </div>
+                </div>
+              )}
+
+              {isCancelling && (
+                <div className="mt-6">
+                  <div className="rounded-xl border border-rose-100 bg-rose-50 p-4">
+                    <p className="text-sm text-rose-800 font-medium">
+                      Are you sure you want to cancel this appointment?
+                    </p>
+                    <p className="text-xs text-rose-600 mt-1">
+                      This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {actionError && (
                 <p
@@ -360,33 +482,69 @@ export function AppointmentDetail({
         </div>
 
         {/* Footer — status action buttons */}
-        {!loading && !fetchError && appointment && actions.length > 0 && (
+        {!loading && !fetchError && appointment && (
           <div className="border-t border-slate-100 px-6 py-4">
-            <div className="flex gap-3">
-              {actions.map(({ label, nextStatus, variant, Icon }) => (
+            {isRescheduling ? (
+              <div className="flex gap-3">
                 <button
-                  key={nextStatus}
                   disabled={isPending}
-                  onClick={() => handleAction(nextStatus)}
-                  className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-60 ${
-                    variant === "primary"
-                      ? "bg-brand text-white hover:bg-teal-800"
-                      : "border border-rose-200 text-rose-500 hover:bg-rose-50"
-                  }`}
+                  onClick={() => setIsRescheduling(false)}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
                 >
-                  <Icon size={15} />
-                  {isPending ? "Saving…" : label}
+                  Back
                 </button>
-              ))}
-            </div>
+                <button
+                  disabled={isPending}
+                  onClick={handleReschedule}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-60"
+                >
+                  {isPending ? "Saving…" : "Save"}
+                </button>
+              </div>
+            ) : isCancelling ? (
+              <div className="flex gap-3">
+                <button
+                  disabled={isPending}
+                  onClick={() => setIsCancelling(false)}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Keep Appointment
+                </button>
+                <button
+                  disabled={isPending}
+                  onClick={() => handleStatusChange("CANCELLED")}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60"
+                >
+                  {isPending ? "Cancelling…" : "Confirm Cancel"}
+                </button>
+              </div>
+            ) : actions.length > 0 ? (
+              <div className="flex flex-wrap gap-3">
+                {actions.map(({ label, onClick, variant, Icon }) => (
+                  <button
+                    key={label}
+                    disabled={isPending}
+                    onClick={onClick}
+                    className={`flex flex-1 min-w-[120px] items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-60 ${
+                      variant === "primary"
+                        ? "bg-brand text-white hover:bg-teal-800"
+                        : variant === "secondary"
+                          ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                          : "border border-rose-200 text-rose-500 hover:bg-rose-50"
+                    }`}
+                  >
+                    <Icon size={15} />
+                    {isPending ? "Saving…" : label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         )}
       </aside>
     </>
   );
 }
-
-// ─── Detail row sub-component ─────────────────────────────────────────────────
 
 function DetailRow({
   icon,

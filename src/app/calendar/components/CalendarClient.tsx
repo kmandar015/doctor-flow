@@ -209,7 +209,7 @@ export function CalendarClient({
           <div className="mt-6 space-y-4">
             {dayAppointments.length === 0 ? (
               <p className="py-6 text-center text-sm text-slate-400">
-                No appointments on this day.
+                No appointments scheduled.
               </p>
             ) : (
               dayAppointments.map((appt) => (

@@ -43,7 +43,9 @@ export function AppointmentList({
       <div className="space-y-2">
         {appointments.length === 0 && (
           <p className="py-6 text-center text-sm text-slate-400">
-            No appointments to show.
+            {upcoming
+              ? "No appointments scheduled."
+              : "No appointments scheduled for today."}
           </p>
         )}
         {appointments.map((appointment) => (
