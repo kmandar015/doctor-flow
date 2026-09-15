@@ -1,4 +1,7 @@
+"use client";
+
 import { ArrowUpRight, CalendarDays, Clock3 } from "lucide-react";
+import Link from "next/link";
 import type { Appointment } from "../types";
 import { AppointmentAvatar } from "./AppointmentAvatar";
 
@@ -12,10 +15,14 @@ export function AppointmentList({
   title,
   appointments,
   upcoming = false,
+  onSelect,
+  viewAllHref = "/bookings",
 }: {
   title: string;
   appointments: Appointment[];
   upcoming?: boolean;
+  onSelect?: (id: string) => void;
+  viewAllHref?: string;
 }) {
   return (
     <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card sm:p-6">
@@ -26,9 +33,12 @@ export function AppointmentList({
             {upcoming ? "Your next scheduled visits" : todayLabel}
           </p>
         </div>
-        <button className="inline-flex items-center gap-1 text-sm font-semibold text-brand">
+        <Link
+          href={viewAllHref}
+          className="inline-flex items-center gap-1 text-sm font-semibold text-brand hover:text-teal-900"
+        >
           View all <ArrowUpRight size={15} />
-        </button>
+        </Link>
       </div>
       <div className="space-y-2">
         {appointments.length === 0 && (
@@ -39,7 +49,8 @@ export function AppointmentList({
         {appointments.map((appointment) => (
           <article
             key={appointment.id}
-            className="flex items-center gap-3 rounded-xl p-2 transition hover:bg-slate-50"
+            onClick={() => onSelect?.(appointment.id)}
+            className={`flex items-center gap-3 rounded-xl p-2 transition hover:bg-slate-50 ${onSelect ? "cursor-pointer" : ""}`}
           >
             <AppointmentAvatar
               initials={appointment.initials}

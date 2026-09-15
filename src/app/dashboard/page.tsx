@@ -2,7 +2,8 @@ import { CalendarDays, ChevronRight } from "lucide-react";
 import { getDashboardSummary } from "@/lib/database/appointments";
 import { getCurrentDoctorId } from "@/lib/database/auth";
 import { toUiAppointment } from "@/lib/appointments/view-models";
-import { AppointmentList } from "./components/AppointmentList";
+import Link from "next/link";
+import { DashboardAppointmentsSection } from "./components/DashboardAppointmentsSection";
 import { PendingRequests } from "./components/PendingRequests";
 import { StatsCards } from "./components/StatsCards";
 import type { Stat } from "./types";
@@ -12,6 +13,7 @@ export default function DashboardPage() {
   const { appointments, patientsCount, stats } = getDashboardSummary(doctorId);
 
   const today = new Date().toISOString().slice(0, 10);
+
   const todaysAppointments = appointments
     .filter((a) => a.appointmentDate === today && a.status !== "PENDING")
     .map(toUiAppointment);
@@ -80,27 +82,26 @@ export default function DashboardPage() {
             Here&apos;s a quick overview of your practice today.
           </p>
         </div>
-        <button className="inline-flex w-fit items-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800">
+        <Link
+          href="/calendar"
+          className="inline-flex w-fit items-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
+        >
           <CalendarDays size={18} />
           View calendar
           <ChevronRight size={16} />
-        </button>
+        </Link>
       </div>
+
       <StatsCards stats={statCards} />
+
       <div className="mt-6">
         <PendingRequests initialRequests={pendingRequests} />
       </div>
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <AppointmentList
-          title="Today's appointments"
-          appointments={todaysAppointments}
-        />
-        <AppointmentList
-          title="Upcoming · confirmed"
-          appointments={upcomingAppointments}
-          upcoming
-        />
-      </div>
+
+      <DashboardAppointmentsSection
+        todaysAppointments={todaysAppointments}
+        upcomingAppointments={upcomingAppointments}
+      />
     </main>
   );
 }

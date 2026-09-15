@@ -1,0 +1,357 @@
+{
+  "info": {
+    "name": "Doctor Flow MVP",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "All API endpoints for the Doctor Flow MVP — appointment management for a single doctor."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "pendingId",
+      "value": "appointment-priya-pending",
+      "type": "string"
+    },
+    {
+      "key": "pendingId2",
+      "value": "appointment-rahul-pending",
+      "type": "string"
+    },
+    {
+      "key": "confirmedId",
+      "value": "appointment-aarav-confirmed",
+      "type": "string"
+    },
+    {
+      "key": "completedId",
+      "value": "appointment-vikram-completed",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Appointments",
+      "item": [
+        {
+          "name": "List all appointments",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"]
+            },
+            "description": "Returns all appointments for the current doctor (ordered by date + time)."
+          }
+        },
+        {
+          "name": "List — filter by status PENDING",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments?status=PENDING",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"],
+              "query": [{ "key": "status", "value": "PENDING" }]
+            }
+          }
+        },
+        {
+          "name": "List — filter by status CONFIRMED",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments?status=CONFIRMED",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"],
+              "query": [{ "key": "status", "value": "CONFIRMED" }]
+            }
+          }
+        },
+        {
+          "name": "List — filter by status COMPLETED",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments?status=COMPLETED",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"],
+              "query": [{ "key": "status", "value": "COMPLETED" }]
+            }
+          }
+        },
+        {
+          "name": "List — filter by today's date",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments?date=2026-09-15",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"],
+              "query": [{ "key": "date", "value": "2026-09-15" }]
+            }
+          }
+        },
+        {
+          "name": "List — filter by date range",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments?from=2026-09-15&to=2026-09-20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"],
+              "query": [
+                { "key": "from", "value": "2026-09-15" },
+                { "key": "to", "value": "2026-09-20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get single appointment",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{pendingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "{{pendingId}}"]
+            },
+            "description": "Returns appointment details including nested patient object."
+          }
+        },
+        {
+          "name": "Get appointment — 404 (ID does not exist)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/does-not-exist",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "does-not-exist"]
+            },
+            "description": "Expected: 404 — Appointment not found."
+          }
+        },
+        {
+          "name": "Create appointment — new patient (MANUAL)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": {\n    \"name\": \"Aisha Desai\",\n    \"phone\": \"+91 99001 12345\",\n    \"email\": \"aisha.desai@example.test\",\n    \"dateOfBirth\": \"1990-06-15\",\n    \"gender\": \"Female\"\n  },\n  \"appointmentDate\": \"2026-09-20\",\n  \"appointmentTime\": \"11:00\",\n  \"reason\": \"General checkup\",\n  \"source\": \"MANUAL\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Creates a new patient + appointment. Status defaults to PENDING."
+          }
+        },
+        {
+          "name": "Create appointment — existing patient by phone (upsert)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": {\n    \"name\": \"Rahul Sharma\",\n    \"phone\": \"+91 99812 32167\"\n  },\n  \"appointmentDate\": \"2026-09-22\",\n  \"appointmentTime\": \"14:00\",\n  \"reason\": \"Follow-up\",\n  \"source\": \"DASHBOARD\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Rahul already exists — patient is reused (no duplicate created). Status = PENDING."
+          }
+        },
+        {
+          "name": "Create appointment — simulated WhatsApp booking",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": {\n    \"name\": \"Suresh Nair\",\n    \"phone\": \"+91 98800 77654\"\n  },\n  \"appointmentDate\": \"2026-09-18\",\n  \"appointmentTime\": \"09:30\",\n  \"reason\": \"Fever and cold\",\n  \"source\": \"WHATSAPP\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Simulates the future WhatsApp webhook calling this endpoint. source=WHATSAPP."
+          }
+        },
+        {
+          "name": "Create appointment — 400 missing required fields",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": { \"name\": \"No Phone\" },\n  \"appointmentDate\": \"2026-09-20\",\n  \"appointmentTime\": \"10:00\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 400 — phone is required."
+          }
+        },
+        {
+          "name": "Create appointment — 400 invalid date format",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": { \"name\": \"Test\", \"phone\": \"+91 99000 11111\" },\n  \"appointmentDate\": \"15-09-2026\",\n  \"appointmentTime\": \"10:00\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 400 — date must be YYYY-MM-DD."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Appointment Status",
+      "item": [
+        {
+          "name": "Accept — PENDING → CONFIRMED",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{pendingId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "{{pendingId}}", "status"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"CONFIRMED\" }",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Reject — PENDING → REJECTED",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{pendingId2}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "{{pendingId2}}", "status"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"REJECTED\" }",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Complete — CONFIRMED → COMPLETED",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{confirmedId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "{{confirmedId}}", "status"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"COMPLETED\" }",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Cancel — CONFIRMED → CANCELLED",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{confirmedId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "{{confirmedId}}", "status"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"CANCELLED\" }",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Invalid transition — 409 PENDING → COMPLETED",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{pendingId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "{{pendingId}}", "status"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"COMPLETED\" }",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 409 — Cannot change PENDING to COMPLETED."
+          }
+        },
+        {
+          "name": "Invalid status value — 400",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{pendingId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "{{pendingId}}", "status"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"APPROVED\" }",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 400 — Invalid appointment status."
+          }
+        },
+        {
+          "name": "Appointment not found — 404",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/does-not-exist/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "does-not-exist", "status"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"CONFIRMED\" }",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 404 — Appointment not found."
+          }
+        }
+      ]
+    }
+  ]
+}
