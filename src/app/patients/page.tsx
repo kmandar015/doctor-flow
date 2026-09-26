@@ -1,10 +1,9 @@
-import { listPatients } from "@/lib/database/appointments";
+import { listPatientsWithStats } from "@/lib/database/patients";
 import { getCurrentDoctorId } from "@/lib/database/auth";
-import { toUiPatient } from "@/lib/appointments/view-models";
 import { PatientsClient } from "./components/PatientsClient";
 
 export default function PatientsPage() {
-  const patients = listPatients(getCurrentDoctorId()).map(toUiPatient);
+  const patients = listPatientsWithStats(getCurrentDoctorId());
 
   return (
     <main className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8 lg:px-10">

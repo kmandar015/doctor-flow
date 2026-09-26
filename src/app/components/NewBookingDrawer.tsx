@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, X } from "lucide-react";
+import { CalendarPlus, Search, X } from "lucide-react";
 import { useToast } from "./ToastContext";
+import type { PatientWithStats } from "@/lib/database/patients";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type PatientMode = "search" | "new";
 
 type FormState = {
   patientName: string;
@@ -51,9 +54,66 @@ export function NewBookingDrawer({
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
+  // Patient search state
+  const [patientMode, setPatientMode] = useState<PatientMode>("search");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<PatientWithStats[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<PatientWithStats | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   if (!open) return null;
 
-  // Generic field updater — clears the field's inline error on change
+  // ── Patient search debounce ──────────────────────────────────────────────
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const q = e.target.value;
+    setSearchQuery(q);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (!q.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    searchDebounceRef.current = setTimeout(() => {
+      setIsSearching(true);
+      fetch(`/api/patients?search=${encodeURIComponent(q)}`)
+        .then((res) => res.json() as Promise<{ patients: PatientWithStats[] }>)
+        .then(({ patients }) => setSearchResults(patients))
+        .catch(() => setSearchResults([]))
+        .finally(() => setIsSearching(false));
+    }, 300);
+  };
+
+  const handleSelectPatient = (patient: PatientWithStats) => {
+    setSelectedPatient(patient);
+    setSearchQuery("");
+    setSearchResults([]);
+    // Pre-fill form fields from existing patient
+    setForm((prev) => ({
+      ...prev,
+      patientName: patient.name,
+      patientPhone: patient.phone,
+      patientEmail: patient.email ?? "",
+      patientDob: patient.dateOfBirth ?? "",
+      patientGender: patient.gender ?? "",
+    }));
+    setErrors({});
+  };
+
+  const handleClearPatient = () => {
+    setSelectedPatient(null);
+    setForm((prev) => ({
+      ...prev,
+      patientName: "",
+      patientPhone: "",
+      patientEmail: "",
+      patientDob: "",
+      patientGender: "",
+    }));
+  };
+
+  // ── Form helpers ──────────────────────────────────────────────────────────
+
   const setField =
     (field: keyof FormState) =>
     (
@@ -70,14 +130,13 @@ export function NewBookingDrawer({
         fetch(`/api/availability/slots?date=${e.target.value}`)
           .then((res) => res.json())
           .then((data) => {
-            setAvailableSlots(data.slots || []);
+            setAvailableSlots((data as { slots?: string[] }).slots ?? []);
           })
           .catch(() => setAvailableSlots([]))
           .finally(() => setLoadingSlots(false));
       }
     };
 
-  // Client-side required-field validation
   function validate(): FieldErrors {
     const errs: FieldErrors = {};
     if (!form.patientName.trim()) errs.patientName = "Name is required.";
@@ -126,11 +185,13 @@ export function NewBookingDrawer({
         return;
       }
 
-      // On success: refresh server data, reset the form, close the drawer
       showToast("Appointment booked successfully.");
       router.refresh();
       setForm(emptyForm);
       setErrors({});
+      setSelectedPatient(null);
+      setPatientMode("search");
+      setSearchQuery("");
       onClose();
     });
   };
@@ -178,64 +239,172 @@ export function NewBookingDrawer({
               <legend className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">
                 Patient
               </legend>
-              <div className="space-y-3">
-                <FormField label="Full name *" error={errors.patientName}>
-                  <input
-                    type="text"
-                    value={form.patientName}
-                    onChange={setField("patientName")}
-                    placeholder="e.g. Aarav Mehta"
-                    className={inputCls(!!errors.patientName)}
-                    autoComplete="name"
-                  />
-                </FormField>
 
-                <FormField label="Phone *" error={errors.patientPhone}>
-                  <input
-                    type="tel"
-                    value={form.patientPhone}
-                    onChange={setField("patientPhone")}
-                    placeholder="e.g. 9876543210"
-                    className={inputCls(!!errors.patientPhone)}
-                    autoComplete="tel"
-                  />
-                </FormField>
+              {/* Mode toggle */}
+              <div className="mb-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPatientMode("search");
+                    handleClearPatient();
+                  }}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                    patientMode === "search"
+                      ? "bg-brand text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  Search existing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPatientMode("new");
+                    handleClearPatient();
+                  }}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                    patientMode === "new"
+                      ? "bg-brand text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  + New patient
+                </button>
+              </div>
 
-                <FormField label="Email">
-                  <input
-                    type="email"
-                    value={form.patientEmail}
-                    onChange={setField("patientEmail")}
-                    placeholder="optional"
-                    className={inputCls(false)}
-                    autoComplete="email"
-                  />
-                </FormField>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField label="Date of birth">
+              {/* Search mode */}
+              {patientMode === "search" && !selectedPatient && (
+                <div className="relative">
+                  <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                    <Search size={16} className="shrink-0 text-slate-400" />
                     <input
-                      type="date"
-                      value={form.patientDob}
-                      onChange={setField("patientDob")}
-                      className={inputCls(false)}
+                      type="text"
+                      value={searchQuery}
+                      onChange={handleSearchChange}
+                      placeholder="Search by name or phone…"
+                      className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                    />
+                  </label>
+                  {(searchResults.length > 0 || isSearching) && (
+                    <div className="absolute z-10 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg">
+                      {isSearching && (
+                        <p className="px-4 py-3 text-xs text-slate-400">
+                          Searching…
+                        </p>
+                      )}
+                      {!isSearching &&
+                        searchResults.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => handleSelectPatient(p)}
+                            className="flex w-full flex-col gap-0.5 px-4 py-3 text-left text-sm hover:bg-slate-50 first:rounded-t-xl last:rounded-b-xl"
+                          >
+                            <span className="font-semibold text-slate-700">
+                              {p.name}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              {p.phone}
+                            </span>
+                          </button>
+                        ))}
+                      {!isSearching && searchResults.length === 0 && searchQuery.trim() && (
+                        <p className="px-4 py-3 text-xs text-slate-400">
+                          No patients found.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <p className="mt-2 text-xs text-slate-400">
+                    Or switch to &quot;+ New patient&quot; to register a walk-in.
+                  </p>
+                </div>
+              )}
+
+              {/* Selected patient card */}
+              {patientMode === "search" && selectedPatient && (
+                <div className="flex items-start justify-between rounded-xl border border-teal-100 bg-teal-50 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">
+                      {selectedPatient.name}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {selectedPatient.phone}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClearPatient}
+                    className="ml-3 text-xs font-semibold text-rose-500 hover:underline"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+
+              {/* New patient fields OR hidden pre-filled fields for search */}
+              {(patientMode === "new" || selectedPatient) && (
+                <div className="mt-3 space-y-3">
+                  <FormField label="Full name *" error={errors.patientName}>
+                    <input
+                      type="text"
+                      value={form.patientName}
+                      onChange={setField("patientName")}
+                      placeholder="e.g. Aarav Mehta"
+                      className={inputCls(!!errors.patientName)}
+                      autoComplete="name"
+                      readOnly={!!selectedPatient}
                     />
                   </FormField>
 
-                  <FormField label="Gender">
-                    <select
-                      value={form.patientGender}
-                      onChange={setField("patientGender")}
-                      className={inputCls(false)}
-                    >
-                      <option value="">Select…</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
+                  <FormField label="Phone *" error={errors.patientPhone}>
+                    <input
+                      type="tel"
+                      value={form.patientPhone}
+                      onChange={setField("patientPhone")}
+                      placeholder="e.g. 9876543210"
+                      className={inputCls(!!errors.patientPhone)}
+                      autoComplete="tel"
+                      readOnly={!!selectedPatient}
+                    />
                   </FormField>
+
+                  <FormField label="Email">
+                    <input
+                      type="email"
+                      value={form.patientEmail}
+                      onChange={setField("patientEmail")}
+                      placeholder="optional"
+                      className={inputCls(false)}
+                      autoComplete="email"
+                    />
+                  </FormField>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField label="Date of birth">
+                      <input
+                        type="date"
+                        value={form.patientDob}
+                        onChange={setField("patientDob")}
+                        className={inputCls(false)}
+                      />
+                    </FormField>
+
+                    <FormField label="Gender">
+                      <select
+                        value={form.patientGender}
+                        onChange={setField("patientGender")}
+                        className={inputCls(false)}
+                      >
+                        <option value="">Select…</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </FormField>
+                  </div>
                 </div>
-              </div>
+              )}
             </fieldset>
 
             {/* ── Appointment ── */}

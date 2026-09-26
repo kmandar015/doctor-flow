@@ -29,6 +29,11 @@
       "key": "completedId",
       "value": "appointment-vikram-completed",
       "type": "string"
+    },
+    {
+      "key": "patientId",
+      "value": "patient-aarav-mehta",
+      "type": "string"
     }
   ],
   "item": [
@@ -527,6 +532,234 @@
               "query": [{ "key": "date", "value": "2026-09-22" }]
             },
             "description": "Returns a list of available time slots for a specific date."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Patients",
+      "item": [
+        {
+          "name": "List all patients",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients"]
+            },
+            "description": "Returns all patients with stats for the current doctor."
+          }
+        },
+        {
+          "name": "List patients — search",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients?search=Aarav",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients"],
+              "query": [{ "key": "search", "value": "Aarav" }]
+            },
+            "description": "Returns patients filtered by name or phone."
+          }
+        },
+        {
+          "name": "Get patient — 200",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/{{patientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients", "{{patientId}}"]
+            },
+            "description": "Returns a single patient with stats."
+          }
+        },
+        {
+          "name": "Get patient — 404",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/does-not-exist",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients", "does-not-exist"]
+            },
+            "description": "Expected: 404 — Patient not found."
+          }
+        },
+        {
+          "name": "Register patient — 201",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Kiran\",\n  \"lastName\": \"Joshi\",\n  \"phone\": \"+91 91234 56789\",\n  \"email\": \"kiran.joshi@example.test\",\n  \"dateOfBirth\": \"1988-07-14\",\n  \"gender\": \"Female\",\n  \"address\": \"101 MG Road, Pune\",\n  \"notes\": \"No known allergies\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Registers a new walk-in patient. Returns 201 with PatientWithStats."
+          }
+        },
+        {
+          "name": "Register patient — 409 duplicate phone",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Aarav\",\n  \"lastName\": \"Mehta\",\n  \"phone\": \"+91 98765 42618\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 409 — Patient with this phone already registered."
+          }
+        },
+        {
+          "name": "Register patient — 400 missing first name",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lastName\": \"Joshi\",\n  \"phone\": \"+91 91234 56780\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 400 — First name is required."
+          }
+        },
+        {
+          "name": "Register patient — 400 missing last name",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Kiran\",\n  \"phone\": \"+91 91234 56781\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 400 — Last name is required."
+          }
+        },
+        {
+          "name": "Register patient — 400 missing phone",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Kiran\",\n  \"lastName\": \"Joshi\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 400 — Phone is required."
+          }
+        },
+        {
+          "name": "Register patient — 400 invalid email",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Kiran\",\n  \"lastName\": \"Joshi\",\n  \"phone\": \"+91 91234 56782\",\n  \"email\": \"not-an-email\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 400 — Invalid email address."
+          }
+        },
+        {
+          "name": "Register patient — 400 future date of birth",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Kiran\",\n  \"lastName\": \"Joshi\",\n  \"phone\": \"+91 91234 56783\",\n  \"dateOfBirth\": \"2099-01-01\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 400 — Date of birth cannot be in the future."
+          }
+        },
+        {
+          "name": "Update patient notes — 200",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/{{patientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients", "{{patientId}}"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Allergic to penicillin. Prefers morning appointments.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Updates patient notes."
+          }
+        },
+        {
+          "name": "Update patient — 404",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/does-not-exist",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients", "does-not-exist"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Test\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 404 — Patient not found."
+          }
+        },
+        {
+          "name": "Get patient appointments — 200",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/{{patientId}}/appointments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients", "{{patientId}}", "appointments"]
+            },
+            "description": "Returns all appointments for a patient, newest first."
           }
         }
       ]

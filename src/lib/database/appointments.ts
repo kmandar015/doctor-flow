@@ -16,6 +16,9 @@ type AppointmentRow = Omit<Appointment, "patient"> & {
   patient_email: string | null;
   patient_date_of_birth: string | null;
   patient_gender: string | null;
+  patient_address: string | null;
+  patient_notes: string | null;
+  patient_doctor_id: string;
   patient_created_at: string;
   patient_updated_at: string;
 };
@@ -25,17 +28,22 @@ const selectAppointment = `SELECT a.id, a.doctor_id AS doctorId, a.patient_id AS
   a.status, a.source, a.created_at AS createdAt, a.updated_at AS updatedAt,
   p.name AS patient_name, p.phone AS patient_phone, p.email AS patient_email,
   p.date_of_birth AS patient_date_of_birth, p.gender AS patient_gender,
+  p.address AS patient_address, p.notes AS patient_notes,
+  p.doctor_id AS patient_doctor_id,
   p.created_at AS patient_created_at, p.updated_at AS patient_updated_at
   FROM appointments a JOIN patients p ON p.id = a.patient_id`;
 
 function toAppointment(row: AppointmentRow): Appointment {
   const patient: Patient = {
     id: row.patientId,
+    doctorId: row.patient_doctor_id,
     name: row.patient_name,
     phone: row.patient_phone,
     email: row.patient_email,
     dateOfBirth: row.patient_date_of_birth,
     gender: row.patient_gender,
+    address: row.patient_address,
+    notes: row.patient_notes,
     createdAt: row.patient_created_at,
     updatedAt: row.patient_updated_at,
   };
@@ -91,6 +99,8 @@ type CreateAppointmentInput = {
     email?: string;
     dateOfBirth?: string;
     gender?: string;
+    address?: string;
+    notes?: string;
   };
   appointmentDate: string;
   appointmentTime: string;
@@ -116,13 +126,14 @@ export function createAppointment(
   }
   const db = getDatabase();
   const now = new Date().toISOString();
+  // Scope patient lookup by doctor_id to prevent cross-doctor leakage
   const existing = db
-    .prepare("SELECT id FROM patients WHERE phone = ?")
-    .get(input.patient.phone) as { id: string } | undefined;
+    .prepare("SELECT id FROM patients WHERE phone = ? AND doctor_id = ?")
+    .get(input.patient.phone, doctorId) as { id: string } | undefined;
   const patientId = existing?.id ?? randomUUID();
   if (existing) {
     db.prepare(
-      "UPDATE patients SET name = ?, email = COALESCE(?, email), date_of_birth = COALESCE(?, date_of_birth), gender = COALESCE(?, gender), updated_at = ? WHERE id = ?",
+      "UPDATE patients SET name = ?, email = COALESCE(?, email), date_of_birth = COALESCE(?, date_of_birth), gender = COALESCE(?, gender), updated_at = ? WHERE id = ? AND doctor_id = ?",
     ).run(
       input.patient.name,
       input.patient.email ?? null,
@@ -130,17 +141,21 @@ export function createAppointment(
       input.patient.gender ?? null,
       now,
       patientId,
+      doctorId,
     );
   } else {
     db.prepare(
-      "INSERT INTO patients (id, name, phone, email, date_of_birth, gender, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO patients (id, doctor_id, name, phone, email, date_of_birth, gender, address, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     ).run(
       patientId,
+      doctorId,
       input.patient.name,
       input.patient.phone,
       input.patient.email ?? null,
       input.patient.dateOfBirth ?? null,
       input.patient.gender ?? null,
+      input.patient.address ?? null,
+      input.patient.notes ?? null,
       now,
       now,
     );
@@ -253,17 +268,21 @@ export function listPatients(doctorId: string) {
   return getDatabase()
     .prepare(
       `SELECT p.id, p.name, p.phone, p.email, p.date_of_birth AS dateOfBirth, p.gender,
-    MAX(a.appointment_date) AS lastVisit, COUNT(a.id) AS visits
-    FROM patients p JOIN appointments a ON a.patient_id = p.id WHERE a.doctor_id = ?
-    GROUP BY p.id ORDER BY p.name`,
+      p.address, p.notes,
+      MAX(a.appointment_date) AS lastVisit, COUNT(a.id) AS visits
+      FROM patients p JOIN appointments a ON a.patient_id = p.id
+      WHERE p.doctor_id = ? AND a.doctor_id = ?
+      GROUP BY p.id ORDER BY p.name`,
     )
-    .all(doctorId) as Array<{
+    .all(doctorId, doctorId) as Array<{
     id: string;
     name: string;
     phone: string;
     email: string | null;
     dateOfBirth: string | null;
     gender: string | null;
+    address: string | null;
+    notes: string | null;
     lastVisit: string;
     visits: number;
   }>;

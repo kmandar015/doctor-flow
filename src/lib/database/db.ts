@@ -15,8 +15,17 @@ function migrate(db: DatabaseSync) {
       specialization TEXT NOT NULL, clinic_name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS patients (
-      id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL UNIQUE, email TEXT,
-      date_of_birth TEXT, gender TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      id TEXT PRIMARY KEY,
+      doctor_id TEXT NOT NULL REFERENCES doctors(id),
+      name TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      email TEXT,
+      date_of_birth TEXT,
+      gender TEXT,
+      address TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS appointments (
       id TEXT PRIMARY KEY, doctor_id TEXT NOT NULL REFERENCES doctors(id), patient_id TEXT NOT NULL REFERENCES patients(id),
@@ -38,8 +47,44 @@ function migrate(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS appointments_patient_id_idx ON appointments(patient_id);
     CREATE INDEX IF NOT EXISTS appointments_date_idx ON appointments(appointment_date);
     CREATE INDEX IF NOT EXISTS appointments_status_idx ON appointments(status);
-    CREATE INDEX IF NOT EXISTS patients_phone_idx ON patients(phone);
+    CREATE INDEX IF NOT EXISTS patients_doctor_id_idx ON patients(doctor_id);
   `);
+
+  // Handle migration of existing patients table that may lack new columns
+  const cols = db
+    .prepare("PRAGMA table_info(patients)")
+    .all() as Array<{ name: string }>;
+
+  if (!cols.some((c) => c.name === "doctor_id")) {
+    db.prepare(
+      "ALTER TABLE patients ADD COLUMN doctor_id TEXT REFERENCES doctors(id)",
+    ).run();
+    db.prepare(
+      "UPDATE patients SET doctor_id = 'doctor-meera-shah' WHERE doctor_id IS NULL",
+    ).run();
+  }
+  if (!cols.some((c) => c.name === "address")) {
+    db.prepare("ALTER TABLE patients ADD COLUMN address TEXT").run();
+  }
+  if (!cols.some((c) => c.name === "notes")) {
+    db.prepare("ALTER TABLE patients ADD COLUMN notes TEXT").run();
+  }
+
+  // Try to create unique index; may fail if duplicates exist (fine in dev)
+  try {
+    db.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS patients_doctor_phone_idx ON patients(doctor_id, phone)",
+    );
+  } catch {
+    // ignore if it fails due to existing duplicates
+  }
+
+  // Drop old non-scoped phone uniqueness index if it exists
+  try {
+    db.exec("DROP INDEX IF EXISTS patients_phone_idx");
+  } catch {
+    // ignore
+  }
 }
 
 export function getDatabase() {

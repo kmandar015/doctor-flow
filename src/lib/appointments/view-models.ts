@@ -74,6 +74,8 @@ type PatientRow = {
   email: string | null;
   dateOfBirth: string | null;
   gender: string | null;
+  address: string | null;
+  notes: string | null;
   lastVisit: string;
   visits: number;
 };

@@ -12,11 +12,14 @@ export type AppointmentSource = (typeof appointmentSources)[number];
 
 export type Patient = {
   id: string;
+  doctorId: string;
   name: string;
   phone: string;
   email: string | null;
   dateOfBirth: string | null;
   gender: string | null;
+  address: string | null;
+  notes: string | null;
   createdAt: string;
   updatedAt: string;
 };

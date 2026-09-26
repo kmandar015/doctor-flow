@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   AlertCircle,
   Ban,
@@ -9,6 +10,7 @@ import {
   Check,
   CheckCircle,
   Clock,
+  ExternalLink,
   FileText,
   Mail,
   Phone,
@@ -403,6 +405,15 @@ export function AppointmentDetail({
                       )}
                     </dl>
                   </section>
+
+                  <Link
+                    href={`/patients/${appointment.patientId}`}
+                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+                    onClick={handleClose}
+                  >
+                    <ExternalLink size={13} />
+                    View patient record
+                  </Link>
 
                   {/* Appointment details */}
                   <section className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
