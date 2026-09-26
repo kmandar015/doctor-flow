@@ -1,11 +1,20 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { getPatientById, listPatientsWithStats, getPatientAppointments } from "@/lib/database/patients";
+import {
+  getPatientById,
+  listPatientsWithStats,
+  getPatientAppointments,
+} from "@/lib/database/patients";
 import { getCurrentDoctorId } from "@/lib/database/auth";
 import { AppointmentAvatar } from "@/app/dashboard/components/AppointmentAvatar";
-import { deriveColor, deriveInitials, formatDate } from "@/lib/appointments/view-models";
+import {
+  deriveColor,
+  deriveInitials,
+  formatDate,
+} from "@/lib/appointments/view-models";
 import { PatientDetailClient } from "./components/PatientDetailClient";
+import { getPatientFollowUps } from "@/lib/database/followUps";
 
 export default async function PatientDetailPage({
   params,
@@ -63,6 +72,7 @@ export default async function PatientDetailPage({
       <PatientDetailClient
         patient={patient}
         initialAppointments={appointments}
+        initialFollowUps={getPatientFollowUps(doctorId, id)}
       />
     </main>
   );

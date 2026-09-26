@@ -193,4 +193,64 @@ export function seedDevelopmentDatabase(db: DatabaseSync) {
     "14:00",
     30,
   );
+
+  const followUps = [
+    [
+      "followup-vikram-today",
+      "patient-vikram-singh",
+      "appointment-vikram-completed",
+      isoDate(0),
+      "Check BP after new medication",
+      null,
+      "PENDING",
+      null,
+    ],
+    [
+      "followup-aarav-upcoming",
+      "patient-aarav-mehta",
+      "appointment-aarav-confirmed",
+      isoDate(5),
+      "Routine 5-day check",
+      "Patient requested afternoon if possible",
+      "PENDING",
+      null,
+    ],
+    [
+      "followup-sunita-overdue",
+      "patient-sunita-desai",
+      null,
+      isoDate(-2),
+      "Monthly diabetes review",
+      null,
+      "PENDING",
+      null,
+    ],
+    [
+      "followup-neha-completed",
+      "patient-neha-kulkarni",
+      null,
+      isoDate(-5),
+      "Skin reaction check",
+      null,
+      "COMPLETED",
+      now,
+    ],
+    [
+      "followup-priya-cancelled",
+      "patient-priya-patil",
+      null,
+      isoDate(1),
+      "Review after treatment",
+      null,
+      "CANCELLED",
+      null,
+    ],
+  ];
+
+  const insertFollowUp = db.prepare(`INSERT INTO follow_ups
+    (id, doctor_id, patient_id, appointment_id, follow_up_date, reason, notes, status, completed_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  for (const f of followUps) {
+    insertFollowUp.run(f[0], "doctor-meera-shah", ...f.slice(1), now, now);
+  }
 }

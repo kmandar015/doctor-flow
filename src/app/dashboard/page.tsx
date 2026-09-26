@@ -6,11 +6,14 @@ import Link from "next/link";
 import { DashboardAppointmentsSection } from "./components/DashboardAppointmentsSection";
 import { PendingRequests } from "./components/PendingRequests";
 import { StatsCards } from "./components/StatsCards";
+import { FollowUpSummary } from "./components/FollowUpSummary";
 import type { Stat } from "./types";
+import { listFollowUps } from "@/lib/database/followUps";
 
 export default function DashboardPage() {
   const doctorId = getCurrentDoctorId();
   const { appointments, patientsCount, stats } = getDashboardSummary(doctorId);
+  const followUps = listFollowUps(doctorId);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -97,6 +100,8 @@ export default function DashboardPage() {
       <div className="mt-6">
         <PendingRequests initialRequests={pendingRequests} />
       </div>
+
+      <FollowUpSummary followUps={followUps} />
 
       <DashboardAppointmentsSection
         todaysAppointments={todaysAppointments}

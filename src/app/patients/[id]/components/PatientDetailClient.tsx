@@ -3,12 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Clock, Tag } from "lucide-react";
-import type { Patient, Appointment } from "@/lib/database/types";
+import { FollowUpDrawer } from "@/app/components/FollowUpDrawer";
+import type { Patient, Appointment, FollowUp } from "@/lib/database/types";
 import { AppointmentDetail } from "@/app/components/AppointmentDetail";
-import {
-  formatDate,
-  formatTime,
-} from "@/lib/appointments/view-models";
+import { formatDate, formatTime } from "@/lib/appointments/view-models";
 import { useToast } from "@/app/components/ToastContext";
 
 // ─── Status helpers ────────────────────────────────────────────────────────────
@@ -34,9 +32,11 @@ const statusLabel: Record<string, string> = {
 export function PatientDetailClient({
   patient,
   initialAppointments,
+  initialFollowUps = [],
 }: {
   patient: Patient;
   initialAppointments: Appointment[];
+  initialFollowUps?: FollowUp[];
 }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -45,6 +45,7 @@ export function PatientDetailClient({
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<
     string | null
   >(null);
+  const [addFollowUpOpen, setAddFollowUpOpen] = useState(false);
 
   // Stats
   const total = initialAppointments.length;
@@ -88,9 +89,7 @@ export function PatientDetailClient({
             </p>
             <dl className="grid gap-3 sm:grid-cols-2">
               <InfoRow label="Phone" value={patient.phone} />
-              {patient.email && (
-                <InfoRow label="Email" value={patient.email} />
-              )}
+              {patient.email && <InfoRow label="Email" value={patient.email} />}
               {patient.dateOfBirth && (
                 <InfoRow
                   label="Date of birth"
@@ -174,6 +173,71 @@ export function PatientDetailClient({
               </div>
             )}
           </section>
+
+          {/* Follow-ups */}
+          <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                Follow-ups
+              </p>
+              <button
+                onClick={() => setAddFollowUpOpen(true)}
+                className="text-xs font-semibold text-brand hover:underline"
+              >
+                + Add Follow-up
+              </button>
+            </div>
+
+            {initialFollowUps.length === 0 ? (
+              <p className="py-8 text-center text-sm text-slate-400">
+                No follow-ups scheduled.
+              </p>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {initialFollowUps.map((followUp) => (
+                  <div
+                    key={followUp.id}
+                    className="w-full py-3 text-left transition hover:bg-slate-50 first:pt-0 last:pb-0"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-3">
+                          <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                            <Calendar size={12} />
+                            {formatDate(followUp.followUpDate)}
+                          </span>
+                        </div>
+                        {followUp.reason && (
+                          <p className="flex items-center gap-1.5 text-xs text-slate-600">
+                            <Tag size={12} />
+                            {followUp.reason}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                          followUp.status === "COMPLETED"
+                            ? "bg-green-50 text-green-700"
+                            : followUp.status === "CANCELLED"
+                              ? "bg-rose-50 text-rose-700"
+                              : followUp.followUpDate <
+                                  new Date().toISOString().slice(0, 10)
+                                ? "bg-orange-50 text-orange-700"
+                                : "bg-blue-50 text-blue-700"
+                        }`}
+                      >
+                        {followUp.status === "PENDING" &&
+                        followUp.followUpDate <
+                          new Date().toISOString().slice(0, 10)
+                          ? "OVERDUE"
+                          : followUp.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
 
         {/* Right: summary stats */}
@@ -184,9 +248,21 @@ export function PatientDetailClient({
             </p>
             <div className="grid grid-cols-2 gap-3">
               <StatCard label="Total" value={total} color="text-slate-700" />
-              <StatCard label="Completed" value={completed} color="text-emerald-600" />
-              <StatCard label="Upcoming" value={upcoming} color="text-teal-600" />
-              <StatCard label="Cancelled" value={cancelled} color="text-slate-400" />
+              <StatCard
+                label="Completed"
+                value={completed}
+                color="text-emerald-600"
+              />
+              <StatCard
+                label="Upcoming"
+                value={upcoming}
+                color="text-teal-600"
+              />
+              <StatCard
+                label="Cancelled"
+                value={cancelled}
+                color="text-slate-400"
+              />
             </div>
           </section>
         </div>
@@ -199,6 +275,14 @@ export function PatientDetailClient({
           onClose={() => setSelectedAppointmentId(null)}
         />
       )}
+
+      {/* Follow Up drawer */}
+      <FollowUpDrawer
+        open={addFollowUpOpen}
+        onClose={() => setAddFollowUpOpen(false)}
+        patient={patient}
+        onSuccess={() => router.refresh()}
+      />
     </>
   );
 }

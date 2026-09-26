@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, Search, X } from "lucide-react";
 import { useToast } from "./ToastContext";
@@ -41,9 +41,20 @@ const emptyForm: FormState = {
 export function NewBookingDrawer({
   open,
   onClose,
+  preselectedPatient,
+  onSuccess,
 }: {
   open: boolean;
   onClose: () => void;
+  preselectedPatient?: {
+    id: string;
+    name: string;
+    phone: string;
+    email?: string | null;
+    dateOfBirth?: string | null;
+    gender?: string | null;
+  };
+  onSuccess?: () => void;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -58,9 +69,42 @@ export function NewBookingDrawer({
   const [patientMode, setPatientMode] = useState<PatientMode>("search");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<PatientWithStats[]>([]);
-  const [selectedPatient, setSelectedPatient] = useState<PatientWithStats | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<
+    PatientWithStats | typeof preselectedPatient | null
+  >(null);
   const [isSearching, setIsSearching] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleClearPatient = () => {
+    setSelectedPatient(null);
+    setForm((prev) => ({
+      ...prev,
+      patientName: "",
+      patientPhone: "",
+      patientEmail: "",
+      patientDob: "",
+      patientGender: "",
+    }));
+  };
+
+  useEffect(() => {
+    if (preselectedPatient && open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedPatient(preselectedPatient);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setForm((prev) => ({
+        ...prev,
+        patientName: preselectedPatient.name,
+        patientPhone: preselectedPatient.phone,
+        patientEmail: preselectedPatient.email ?? "",
+        patientDob: preselectedPatient.dateOfBirth ?? "",
+        patientGender: preselectedPatient.gender ?? "",
+      }));
+    } else if (!open) {
+      handleClearPatient();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselectedPatient, open]);
 
   if (!open) return null;
 
@@ -98,18 +142,6 @@ export function NewBookingDrawer({
       patientGender: patient.gender ?? "",
     }));
     setErrors({});
-  };
-
-  const handleClearPatient = () => {
-    setSelectedPatient(null);
-    setForm((prev) => ({
-      ...prev,
-      patientName: "",
-      patientPhone: "",
-      patientEmail: "",
-      patientDob: "",
-      patientGender: "",
-    }));
   };
 
   // ── Form helpers ──────────────────────────────────────────────────────────
@@ -192,6 +224,7 @@ export function NewBookingDrawer({
       setSelectedPatient(null);
       setPatientMode("search");
       setSearchQuery("");
+      onSuccess?.();
       onClose();
     });
   };
@@ -244,6 +277,7 @@ export function NewBookingDrawer({
               <div className="mb-3 flex gap-2">
                 <button
                   type="button"
+                  disabled={!!preselectedPatient}
                   onClick={() => {
                     setPatientMode("search");
                     handleClearPatient();
@@ -252,12 +286,13 @@ export function NewBookingDrawer({
                     patientMode === "search"
                       ? "bg-brand text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                  } disabled:opacity-50`}
                 >
                   Search existing
                 </button>
                 <button
                   type="button"
+                  disabled={!!preselectedPatient}
                   onClick={() => {
                     setPatientMode("new");
                     handleClearPatient();
@@ -266,7 +301,7 @@ export function NewBookingDrawer({
                     patientMode === "new"
                       ? "bg-brand text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                  } disabled:opacity-50`}
                 >
                   + New patient
                 </button>
@@ -308,15 +343,18 @@ export function NewBookingDrawer({
                             </span>
                           </button>
                         ))}
-                      {!isSearching && searchResults.length === 0 && searchQuery.trim() && (
-                        <p className="px-4 py-3 text-xs text-slate-400">
-                          No patients found.
-                        </p>
-                      )}
+                      {!isSearching &&
+                        searchResults.length === 0 &&
+                        searchQuery.trim() && (
+                          <p className="px-4 py-3 text-xs text-slate-400">
+                            No patients found.
+                          </p>
+                        )}
                     </div>
                   )}
                   <p className="mt-2 text-xs text-slate-400">
-                    Or switch to &quot;+ New patient&quot; to register a walk-in.
+                    Or switch to &quot;+ New patient&quot; to register a
+                    walk-in.
                   </p>
                 </div>
               )}
@@ -332,13 +370,15 @@ export function NewBookingDrawer({
                       {selectedPatient.phone}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleClearPatient}
-                    className="ml-3 text-xs font-semibold text-rose-500 hover:underline"
-                  >
-                    Clear
-                  </button>
+                  {!preselectedPatient && (
+                    <button
+                      type="button"
+                      onClick={handleClearPatient}
+                      className="ml-3 text-xs font-semibold text-rose-500 hover:underline"
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
               )}
 

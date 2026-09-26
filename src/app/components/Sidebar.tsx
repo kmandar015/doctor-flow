@@ -23,6 +23,7 @@ const items = [
   { label: "Bookings", icon: ClipboardList, href: "/bookings" },
   { label: "Calendar", icon: CalendarDays, href: "/calendar" },
   { label: "Patients", icon: Users, href: "/patients" },
+  { label: "Follow-ups", icon: ClipboardList, href: "/follow-ups" },
   { label: "Availability", icon: Clock, href: "/availability" },
   { label: "My Account", icon: Settings, href: "/account" },
 ];

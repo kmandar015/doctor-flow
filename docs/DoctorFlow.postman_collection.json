@@ -763,6 +763,91 @@
           }
         }
       ]
+    },
+    {
+      "name": "Follow-ups",
+      "item": [
+        {
+          "name": "List all follow-ups",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/follow-ups",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "follow-ups"]
+            },
+            "description": "Returns all follow-ups for the current doctor."
+          }
+        },
+        {
+          "name": "List — filter by today",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/follow-ups?filter=today",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "follow-ups"],
+              "query": [{ "key": "filter", "value": "today" }]
+            }
+          }
+        },
+        {
+          "name": "Get single follow-up",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/follow-ups/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "follow-ups", "1"]
+            }
+          }
+        },
+        {
+          "name": "Create follow-up",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/follow-ups",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "follow-ups"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": \"patient-aarav-mehta\",\n  \"followUpDate\": \"2026-10-15\",\n  \"reason\": \"Routine check\",\n  \"notes\": \"Test\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Update follow-up status",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/follow-ups/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "follow-ups", "1"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Get patient follow-ups",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/{{patientId}}/follow-ups",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients", "{{patientId}}", "follow-ups"]
+            }
+          }
+        }
+      ]
     }
   ]
 }

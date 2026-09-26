@@ -10,6 +10,9 @@ export type AppointmentStatus = (typeof appointmentStatuses)[number];
 export const appointmentSources = ["WHATSAPP", "DASHBOARD", "MANUAL"] as const;
 export type AppointmentSource = (typeof appointmentSources)[number];
 
+export const followUpStatuses = ["PENDING", "COMPLETED", "CANCELLED"] as const;
+export type FollowUpStatus = (typeof followUpStatuses)[number];
+
 export type Patient = {
   id: string;
   doctorId: string;
@@ -46,6 +49,21 @@ export type Appointment = {
   createdAt: string;
   updatedAt: string;
   patient: Patient;
+};
+
+export type FollowUp = {
+  id: string;
+  doctorId: string;
+  patientId: string;
+  appointmentId: string | null;
+  followUpDate: string;
+  reason: string | null;
+  notes: string | null;
+  status: FollowUpStatus;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  patient?: Patient;
 };
 
 export type DoctorAvailability = {

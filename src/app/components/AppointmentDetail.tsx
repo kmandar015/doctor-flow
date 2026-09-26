@@ -28,6 +28,7 @@ import {
   formatTime,
 } from "@/lib/appointments/view-models";
 import { useToast } from "./ToastContext";
+import { FollowUpDrawer } from "./FollowUpDrawer";
 
 // ─── Status display helpers ───────────────────────────────────────────────────
 
@@ -77,6 +78,7 @@ export function AppointmentDetail({
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [addFollowUpOpen, setAddFollowUpOpen] = useState(false);
 
   const { resolvedId, appointment, error: fetchError } = fetchState;
   const loading =
@@ -85,6 +87,7 @@ export function AppointmentDetail({
   const handleClose = () => {
     setIsRescheduling(false);
     setIsCancelling(false);
+    setAddFollowUpOpen(false);
     onClose();
   };
 
@@ -463,6 +466,13 @@ export function AppointmentDetail({
                       />
                     </dl>
                   </section>
+
+                  <button
+                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+                    onClick={() => setAddFollowUpOpen(true)}
+                  >
+                    + Add Follow-up
+                  </button>
                 </>
               )}
 
@@ -590,6 +600,16 @@ export function AppointmentDetail({
           </div>
         )}
       </aside>
+
+      {/* Follow Up drawer */}
+      {appointment && (
+        <FollowUpDrawer
+          open={addFollowUpOpen}
+          onClose={() => setAddFollowUpOpen(false)}
+          patient={appointment.patient}
+          appointmentId={appointment.id}
+        />
+      )}
     </>
   );
 }
