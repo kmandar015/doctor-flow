@@ -2,10 +2,20 @@ import { listAppointments } from "@/lib/database/appointments";
 import { getCurrentDoctorId } from "@/lib/database/auth";
 import { deriveColor, deriveInitials } from "@/lib/appointments/view-models";
 import { CalendarClient } from "./components/CalendarClient";
+import { getDoctorAvailability } from "@/lib/database/availability";
 
 export default function CalendarPage() {
   const doctorId = getCurrentDoctorId();
   const raw = listAppointments(doctorId);
+  const availability = getDoctorAvailability(doctorId) || {
+    doctorId,
+    workingDays: [1, 2, 3, 4, 5],
+    workStart: "09:00",
+    workEnd: "17:00",
+    breakStart: null,
+    breakEnd: null,
+    slotDuration: 30,
+  };
 
   // Pass only the fields CalendarClient needs; filter to active statuses.
   const appointments = raw
@@ -32,7 +42,7 @@ export default function CalendarPage() {
           See your availability and upcoming consultations.
         </p>
       </div>
-      <CalendarClient appointments={appointments} />
+      <CalendarClient appointments={appointments} availability={availability} />
     </main>
   );
 }

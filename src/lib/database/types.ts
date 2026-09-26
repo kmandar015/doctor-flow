@@ -1,4 +1,10 @@
-export const appointmentStatuses = ["PENDING", "CONFIRMED", "REJECTED", "COMPLETED", "CANCELLED"] as const;
+export const appointmentStatuses = [
+  "PENDING",
+  "CONFIRMED",
+  "REJECTED",
+  "COMPLETED",
+  "CANCELLED",
+] as const;
 export type AppointmentStatus = (typeof appointmentStatuses)[number];
 
 export const appointmentSources = ["WHATSAPP", "DASHBOARD", "MANUAL"] as const;
@@ -37,4 +43,14 @@ export type Appointment = {
   createdAt: string;
   updatedAt: string;
   patient: Patient;
+};
+
+export type DoctorAvailability = {
+  doctorId: string;
+  workingDays: number[]; // 0 = Sunday, 1 = Monday, etc.
+  workStart: string; // "HH:MM"
+  workEnd: string; // "HH:MM"
+  breakStart: string | null;
+  breakEnd: string | null;
+  slotDuration: number; // in minutes
 };

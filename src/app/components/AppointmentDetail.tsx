@@ -72,6 +72,8 @@ export function AppointmentDetail({
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
 
   const { resolvedId, appointment, error: fetchError } = fetchState;
@@ -83,6 +85,32 @@ export function AppointmentDetail({
     setIsCancelling(false);
     onClose();
   };
+
+  useEffect(() => {
+    if (!rescheduleDate) {
+      setTimeout(() => setAvailableSlots([]), 0);
+      return;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoadingSlots(true);
+    let cancelled = false;
+    fetch(
+      `/api/availability/slots?date=${rescheduleDate}&excludeId=${appointmentId}`,
+    )
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setAvailableSlots(data.slots || []);
+      })
+      .catch(() => {
+        if (!cancelled) setAvailableSlots([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSlots(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rescheduleDate, appointmentId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -445,13 +473,22 @@ export function AppointmentDetail({
                     <label className="text-sm font-semibold text-slate-700">
                       New Time
                     </label>
-                    <input
-                      type="time"
+                    <select
                       value={rescheduleTime}
                       onChange={(e) => setRescheduleTime(e.target.value)}
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none focus:border-brand focus:bg-white focus:ring-4 focus:ring-brand/10"
+                      disabled={loadingSlots}
                       required
-                    />
+                    >
+                      <option value="">
+                        {loadingSlots ? "Loading..." : "Select time"}
+                      </option>
+                      {availableSlots.map((slot) => (
+                        <option key={slot} value={slot}>
+                          {slot}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               )}

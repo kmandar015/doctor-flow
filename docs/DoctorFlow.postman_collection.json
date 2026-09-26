@@ -241,6 +241,42 @@
             },
             "description": "Expected: 409 — Time slot already booked."
           }
+        },
+        {
+          "name": "Create appointment — 400 Outside working hours",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": { \"name\": \"Outside\", \"phone\": \"+91 99000 22222\" },\n  \"appointmentDate\": \"2026-09-21\",\n  \"appointmentTime\": \"06:00\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 400 — Outside working hours."
+          }
+        },
+        {
+          "name": "Create appointment — 400 Non-working day",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": { \"name\": \"Weekend\", \"phone\": \"+91 99000 33333\" },\n  \"appointmentDate\": \"2026-09-20\",\n  \"appointmentTime\": \"10:00\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 400 — Non-working day (assuming Sunday is non-working)."
+          }
         }
       ]
     },
@@ -425,6 +461,72 @@
               "options": { "raw": { "language": "json" } }
             },
             "description": "Expected: 409 — Time slot is already booked."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Availability",
+      "item": [
+        {
+          "name": "Get Availability",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/availability",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "availability"]
+            },
+            "description": "Returns the doctor's configured availability."
+          }
+        },
+        {
+          "name": "Update Availability",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/api/availability",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "availability"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workingDays\": [1, 2, 3, 4, 5],\n  \"workStart\": \"09:00\",\n  \"workEnd\": \"17:00\",\n  \"breakStart\": \"13:00\",\n  \"breakEnd\": \"14:00\",\n  \"slotDuration\": 30\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Updates the doctor's availability settings."
+          }
+        },
+        {
+          "name": "Update Availability — Invalid (400)",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/api/availability",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "availability"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workingDays\": [1, 2, 3, 4, 5],\n  \"workStart\": \"18:00\",\n  \"workEnd\": \"17:00\",\n  \"breakStart\": null,\n  \"breakEnd\": null,\n  \"slotDuration\": 30\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Expected: 400 — Work start time must be before end time."
+          }
+        },
+        {
+          "name": "Get Available Slots",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/availability/slots?date=2026-09-22",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "availability", "slots"],
+              "query": [{ "key": "date", "value": "2026-09-22" }]
+            },
+            "description": "Returns a list of available time slots for a specific date."
           }
         }
       ]

@@ -58,10 +58,14 @@ const daysInMonth = (year: number, month: number) =>
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+import type { DoctorAvailability } from "@/lib/database/types";
+
 export function CalendarClient({
   appointments,
+  availability,
 }: {
   appointments: CalendarAppointment[];
+  availability: DoctorAvailability;
 }) {
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
@@ -110,6 +114,50 @@ export function CalendarClient({
   const dayAppointments = appointments
     .filter((a) => a.date === selectedDateStr)
     .sort((a, b) => a.time.localeCompare(b.time));
+
+  // Generate slots
+  const dayOfWeek = new Date(`${selectedDateStr}T00:00:00`).getDay();
+  const isWorkingDay = availability.workingDays.includes(dayOfWeek);
+  const daySlots: Array<{
+    time: string;
+    isBreak: boolean;
+    appointment?: CalendarAppointment;
+  }> = [];
+
+  if (isWorkingDay) {
+    let [hour, minute] = availability.workStart.split(":").map(Number);
+    const [endHour, endMinute] = availability.workEnd.split(":").map(Number);
+
+    while (hour < endHour || (hour === endHour && minute < endMinute)) {
+      const timeStr = `${pad(hour)}:${pad(minute)}`;
+      let isBreak = false;
+      if (
+        availability.breakStart &&
+        availability.breakEnd &&
+        timeStr >= availability.breakStart &&
+        timeStr < availability.breakEnd
+      ) {
+        isBreak = true;
+      }
+
+      const appt = dayAppointments.find((a) => a.time === timeStr);
+      daySlots.push({ time: timeStr, isBreak, appointment: appt });
+
+      minute += availability.slotDuration;
+      while (minute >= 60) {
+        hour++;
+        minute -= 60;
+      }
+    }
+  }
+
+  // Include any appointments outside generated slots
+  dayAppointments.forEach((appt) => {
+    if (!daySlots.find((s) => s.time === appt.time)) {
+      daySlots.push({ time: appt.time, isBreak: false, appointment: appt });
+    }
+  });
+  daySlots.sort((a, b) => a.time.localeCompare(b.time));
 
   const selectedDateLabel = new Intl.DateTimeFormat("en-IN", {
     weekday: "long",
@@ -207,36 +255,49 @@ export function CalendarClient({
           </h2>
 
           <div className="mt-6 space-y-4">
-            {dayAppointments.length === 0 ? (
+            {!isWorkingDay ? (
               <p className="py-6 text-center text-sm text-slate-400">
-                No appointments scheduled.
+                Non-working day.
+              </p>
+            ) : daySlots.length === 0 ? (
+              <p className="py-6 text-center text-sm text-slate-400">
+                No slots available.
               </p>
             ) : (
-              dayAppointments.map((appt) => (
-                <button
-                  key={appt.id}
-                  onClick={() => setSelectedId(appt.id)}
-                  className="flex w-full gap-3 border-l-2 border-brand pl-3 text-left transition hover:opacity-70"
-                >
+              daySlots.map(({ time, isBreak, appointment: appt }) => (
+                <div key={time} className="flex w-full gap-3 text-left">
                   <p className="w-14 pt-1 text-xs font-bold text-slate-500">
-                    {formatTime(appt.time)}
+                    {formatTime(time)}
                   </p>
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <AppointmentAvatar
-                      initials={appt.initials}
-                      color={appt.color}
-                      size="sm"
-                    />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-700">
-                        {appt.patient}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs text-slate-400">
-                        {appt.reason}
-                      </p>
+                  {isBreak ? (
+                    <div className="flex-1 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-3 text-sm font-medium text-slate-400 flex items-center justify-center">
+                      Break
                     </div>
-                  </div>
-                </button>
+                  ) : appt ? (
+                    <button
+                      onClick={() => setSelectedId(appt.id)}
+                      className="flex min-w-0 flex-1 items-center gap-2 border-l-2 border-brand pl-3 transition hover:opacity-70"
+                    >
+                      <AppointmentAvatar
+                        initials={appt.initials}
+                        color={appt.color}
+                        size="sm"
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-700">
+                          {appt.patient}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-slate-400">
+                          {appt.reason}
+                        </p>
+                      </div>
+                    </button>
+                  ) : (
+                    <div className="flex-1 rounded-xl border border-dashed border-teal-100 bg-teal-50/30 p-3 text-sm font-medium text-teal-600/60 flex items-center justify-center">
+                      Available
+                    </div>
+                  )}
+                </div>
               ))
             )}
           </div>

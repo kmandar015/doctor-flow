@@ -70,5 +70,16 @@ export async function PATCH(
     );
   }
 
+  if (
+    ["PAST", "NON_WORKING_DAY", "OUTSIDE_HOURS", "BREAK"].includes(result.kind)
+  ) {
+    return NextResponse.json(
+      {
+        error: "This time slot is outside your working hours or is invalid.",
+      },
+      { status: 400 },
+    );
+  }
+
   return NextResponse.json({ appointment: result.appointment });
 }

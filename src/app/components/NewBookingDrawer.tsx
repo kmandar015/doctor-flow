@@ -48,6 +48,8 @@ export function NewBookingDrawer({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   if (!open) return null;
 
@@ -61,6 +63,18 @@ export function NewBookingDrawer({
     ) => {
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
       if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
+
+      if (field === "appointmentDate") {
+        setForm((prev) => ({ ...prev, appointmentTime: "" }));
+        setLoadingSlots(true);
+        fetch(`/api/availability/slots?date=${e.target.value}`)
+          .then((res) => res.json())
+          .then((data) => {
+            setAvailableSlots(data.slots || []);
+          })
+          .catch(() => setAvailableSlots([]))
+          .finally(() => setLoadingSlots(false));
+      }
     };
 
   // Client-side required-field validation
@@ -241,12 +255,21 @@ export function NewBookingDrawer({
                   </FormField>
 
                   <FormField label="Time *" error={errors.appointmentTime}>
-                    <input
-                      type="time"
+                    <select
                       value={form.appointmentTime}
                       onChange={setField("appointmentTime")}
                       className={inputCls(!!errors.appointmentTime)}
-                    />
+                      disabled={!form.appointmentDate || loadingSlots}
+                    >
+                      <option value="">
+                        {loadingSlots ? "Loading..." : "Select time"}
+                      </option>
+                      {availableSlots.map((slot) => (
+                        <option key={slot} value={slot}>
+                          {slot}
+                        </option>
+                      ))}
+                    </select>
                   </FormField>
                 </div>
 

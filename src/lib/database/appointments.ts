@@ -8,6 +8,7 @@ import type {
   AppointmentStatus,
   Patient,
 } from "./types";
+import { checkSlot } from "./availability";
 
 type AppointmentRow = Omit<Appointment, "patient"> & {
   patient_name: string;
@@ -102,6 +103,14 @@ export function createAppointment(
   doctorId: string,
   input: CreateAppointmentInput,
 ) {
+  const slotStatus = checkSlot(
+    doctorId,
+    input.appointmentDate,
+    input.appointmentTime,
+  );
+  if (slotStatus !== "AVAILABLE") {
+    throw new Error(slotStatus);
+  }
   if (hasConflict(doctorId, input.appointmentDate, input.appointmentTime)) {
     throw new Error("CONFLICT");
   }
@@ -212,6 +221,11 @@ export function rescheduleAppointment(
 ) {
   const appointment = getAppointment(doctorId, id);
   if (!appointment) return { kind: "not-found" as const };
+
+  const slotStatus = checkSlot(doctorId, appointmentDate, appointmentTime);
+  if (slotStatus !== "AVAILABLE") {
+    return { kind: slotStatus };
+  }
 
   if (hasConflict(doctorId, appointmentDate, appointmentTime, id)) {
     return { kind: "conflict" as const };

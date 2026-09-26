@@ -25,6 +25,15 @@ function migrate(db: DatabaseSync) {
       source TEXT NOT NULL CHECK(source IN ('WHATSAPP','DASHBOARD','MANUAL')),
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS doctor_availability (
+      doctor_id TEXT PRIMARY KEY REFERENCES doctors(id),
+      working_days TEXT NOT NULL,
+      work_start TEXT NOT NULL,
+      work_end TEXT NOT NULL,
+      break_start TEXT,
+      break_end TEXT,
+      slot_duration INTEGER NOT NULL
+    );
     CREATE INDEX IF NOT EXISTS appointments_doctor_id_idx ON appointments(doctor_id);
     CREATE INDEX IF NOT EXISTS appointments_patient_id_idx ON appointments(patient_id);
     CREATE INDEX IF NOT EXISTS appointments_date_idx ON appointments(appointment_date);

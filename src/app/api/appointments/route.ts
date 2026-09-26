@@ -111,14 +111,29 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ appointment }, { status: 201 });
   } catch (error: unknown) {
-    if (error instanceof Error && error.message === "CONFLICT") {
-      return NextResponse.json(
-        {
-          error:
-            "This time slot is already booked. Please choose another time.",
-        },
-        { status: 409 },
-      );
+    if (error instanceof Error) {
+      if (error.message === "CONFLICT") {
+        return NextResponse.json(
+          {
+            error:
+              "This time slot is already booked. Please choose another time.",
+          },
+          { status: 409 },
+        );
+      }
+      if (
+        ["PAST", "NON_WORKING_DAY", "OUTSIDE_HOURS", "BREAK"].includes(
+          error.message,
+        )
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "This time slot is outside your working hours or is invalid.",
+          },
+          { status: 400 },
+        );
+      }
     }
     return NextResponse.json(
       { error: "An unexpected error occurred." },
