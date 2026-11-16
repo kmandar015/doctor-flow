@@ -1,21 +1,37 @@
 import { CalendarDays, ChevronRight } from "lucide-react";
+import { CLINIC_TIME_ZONE, currentTimeHHMM, endOfMonthISO, todayISO } from "@/lib/dates";
 import { getDashboardSummary } from "@/lib/database/appointments";
 import { getCurrentDoctorId } from "@/lib/database/auth";
+import { getDoctorById } from "@/lib/database/doctors";
+import { getAppointmentStats, getPatientStats, getFollowUpStats } from "@/lib/database/reports";
 import { toUiAppointment } from "@/lib/appointments/view-models";
 import Link from "next/link";
 import { DashboardAppointmentsSection } from "./components/DashboardAppointmentsSection";
 import { PendingRequests } from "./components/PendingRequests";
 import { StatsCards } from "./components/StatsCards";
 import { FollowUpSummary } from "./components/FollowUpSummary";
+import { ReportSummary } from "./components/ReportSummary";
+import { SendRemindersButton } from "./components/SendRemindersButton";
+import { AutoRefresh } from "@/app/components/AutoRefresh";
 import type { Stat } from "./types";
 import { listFollowUps } from "@/lib/database/followUps";
 
-export default function DashboardPage() {
-  const doctorId = getCurrentDoctorId();
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage() {
+  const doctorId = (await getCurrentDoctorId());
+  const doctorName = getDoctorById(doctorId)?.name ?? "Doctor";
   const { appointments, patientsCount, stats } = getDashboardSummary(doctorId);
   const followUps = listFollowUps(doctorId);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
+
+  // Monthly report stats for dashboard summary
+  const monthStart = `${today.slice(0, 7)}-01`;
+  const monthEnd = endOfMonthISO(today);
+  const monthAppointments = getAppointmentStats(doctorId, monthStart, monthEnd);
+  const monthPatients = getPatientStats(doctorId, monthStart, monthEnd);
+  const monthFollowUps = getFollowUpStats(doctorId, monthStart, monthEnd);
 
   const todaysAppointments = appointments
     .filter((a) => a.appointmentDate === today && a.status !== "PENDING")
@@ -69,7 +85,12 @@ export default function DashboardPage() {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: CLINIC_TIME_ZONE,
   }).format(new Date());
+
+  const hour = Number(currentTimeHHMM().slice(0, 2));
+  const greeting =
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
     <main className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8 lg:px-10">
@@ -79,12 +100,14 @@ export default function DashboardPage() {
             {todayFormatted}
           </p>
           <h1 className="text-2xl font-bold tracking-tight text-slate-800 sm:text-3xl">
-            Good morning, Dr. Meera <span aria-hidden>👋</span>
+            {greeting}, {doctorName} <span aria-hidden>👋</span>
           </h1>
           <p className="mt-2 text-sm text-slate-400">
             Here&apos;s a quick overview of your practice today.
           </p>
         </div>
+        <div className="flex flex-wrap gap-3">
+        <SendRemindersButton />
         <Link
           href="/calendar"
           className="inline-flex w-fit items-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
@@ -93,15 +116,29 @@ export default function DashboardPage() {
           View calendar
           <ChevronRight size={16} />
         </Link>
+        </div>
       </div>
+      <AutoRefresh />
 
       <StatsCards stats={statCards} />
 
       <div className="mt-6">
-        <PendingRequests initialRequests={pendingRequests} />
+        <PendingRequests
+          key={pendingRequests.map((r) => r.id).join(",")}
+          initialRequests={pendingRequests}
+        />
       </div>
 
       <FollowUpSummary followUps={followUps} />
+
+      <ReportSummary
+        stats={{
+          appointments: monthAppointments.total,
+          completed: monthAppointments.completed,
+          newPatients: monthPatients.new,
+          followUps: monthFollowUps.total,
+        }}
+      />
 
       <DashboardAppointmentsSection
         todaysAppointments={todaysAppointments}

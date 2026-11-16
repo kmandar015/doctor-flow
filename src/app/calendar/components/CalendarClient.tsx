@@ -59,6 +59,7 @@ const daysInMonth = (year: number, month: number) =>
 // ─── Component ────────────────────────────────────────────────────────────────
 
 import type { DoctorAvailability } from "@/lib/database/types";
+import { todayISO } from "@/lib/dates";
 
 export function CalendarClient({
   appointments,
@@ -67,12 +68,12 @@ export function CalendarClient({
   appointments: CalendarAppointment[];
   availability: DoctorAvailability;
 }) {
-  const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
+  const todayStr = todayISO();
+  const [todayYear, todayMonth, todayDay] = todayStr.split("-").map(Number);
 
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth()); // 0-indexed
-  const [selectedDay, setSelectedDay] = useState(now.getDate());
+  const [year, setYear] = useState(todayYear);
+  const [month, setMonth] = useState(todayMonth - 1); // 0-indexed
+  const [selectedDay, setSelectedDay] = useState(todayDay);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // ── Month navigation ──

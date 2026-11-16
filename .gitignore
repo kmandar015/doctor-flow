@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# local SQLite database (seeded automatically on first run; holds patient data)
+/data/*.sqlite*
 
 # vercel
 .vercel

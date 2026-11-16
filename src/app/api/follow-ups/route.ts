@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentDoctorId } from "@/lib/database/auth";
 import { listFollowUps, createFollowUp } from "@/lib/database/followUps";
+import { notifyFollowUpScheduled } from "@/lib/whatsapp/notify";
 import { type FollowUpStatus, followUpStatuses } from "@/lib/database/types";
 
 export const runtime = "nodejs";
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({
-    followUps: listFollowUps(getCurrentDoctorId(), {
+    followUps: listFollowUps((await getCurrentDoctorId()), {
       status: status as FollowUpStatus | undefined,
       filter: filter as
         | "today"
@@ -77,13 +78,14 @@ export async function POST(request: NextRequest) {
     typeof value === "string" ? value.trim() || undefined : undefined;
 
   try {
-    const followUp = createFollowUp(getCurrentDoctorId(), {
+    const followUp = createFollowUp((await getCurrentDoctorId()), {
       patientId: input.patientId.trim(),
       appointmentId: text(input.appointmentId),
       followUpDate: input.followUpDate,
       reason: text(input.reason),
       notes: text(input.notes),
     });
+    await notifyFollowUpScheduled(followUp);
     return NextResponse.json({ followUp }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof Error) {

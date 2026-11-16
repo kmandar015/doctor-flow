@@ -1,11 +1,17 @@
-import { Bell, ChevronRight, LockKeyhole, Stethoscope } from "lucide-react";
-const fields = [
-  ["Full name", "Dr. Meera Shah"],
-  ["Email address", "meera.shah@doctorflow.in"],
-  ["Phone number", "+91 98765 21098"],
-  ["Speciality", "General Physician"],
-];
-export default function AccountPage() {
+import { ChevronRight, MessageCircle } from "lucide-react";
+import Link from "next/link";
+import { getCurrentDoctorId } from "@/lib/database/auth";
+import { doctorInitials, getDoctorById } from "@/lib/database/doctors";
+import { getWhatsAppConfig } from "@/lib/whatsapp/config";
+import { AccountForm } from "./AccountForm";
+
+export const dynamic = "force-dynamic";
+
+export default async function AccountPage() {
+  const doctor = getDoctorById(await getCurrentDoctorId());
+  if (!doctor) return null;
+  const whatsapp = getWhatsAppConfig();
+
   return (
     <main className="mx-auto max-w-[1100px] px-5 py-8 sm:px-8 lg:px-10">
       <div className="pt-8 md:pt-0">
@@ -20,86 +26,44 @@ export default function AccountPage() {
       <div className="mt-7 grid gap-6 lg:grid-cols-[0.85fr_1.45fr]">
         <section className="rounded-2xl border border-slate-100 bg-white p-6 text-center shadow-card">
           <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-[#dbeeea] text-2xl font-bold text-brand">
-            DM
+            {doctorInitials(doctor.name)}
           </div>
-          <h2 className="mt-4 font-bold text-slate-800">Dr. Meera Shah</h2>
-          <p className="mt-1 text-sm text-slate-400">General Physician</p>
+          <h2 className="mt-4 font-bold text-slate-800">{doctor.name}</h2>
+          <p className="mt-1 text-sm text-slate-400">{doctor.specialization}</p>
           <div className="mt-6 rounded-xl bg-teal-50 p-4 text-left">
             <p className="text-xs font-bold uppercase tracking-wide text-brand">
               Practice profile
             </p>
             <p className="mt-2 text-sm font-semibold text-slate-700">
-              Meera Care Clinic
+              {doctor.clinicName}
             </p>
             <p className="mt-1 text-xs leading-5 text-slate-400">
-              Pune, Maharashtra
-              <br />
-              Open Mon–Sat · 9 AM–7 PM
+              {doctor.email}
             </p>
           </div>
         </section>
         <div className="space-y-6">
-          <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card sm:p-6">
-            <div className="flex items-center gap-3">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-teal-50 text-brand">
-                <Stethoscope size={20} />
-              </span>
-              <div>
-                <h2 className="font-bold text-slate-800">Profile details</h2>
-                <p className="mt-0.5 text-sm text-slate-400">
-                  Visible to your patients
-                </p>
-              </div>
-            </div>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              {fields.map(([label, value]) => (
-                <label
-                  key={label}
-                  className="text-xs font-bold uppercase tracking-wide text-slate-400"
-                >
-                  {label}
-                  <input
-                    defaultValue={value}
-                    className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm font-medium normal-case tracking-normal text-slate-700 outline-none focus:border-brand"
-                  />
-                </label>
-              ))}
-            </div>
-            <button className="mt-6 rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white hover:bg-teal-800">
-              Save changes
-            </button>
-          </section>
+          <AccountForm doctor={doctor} />
           <section className="rounded-2xl border border-slate-100 bg-white shadow-card">
-            <button className="flex w-full items-center gap-3 p-5 text-left sm:p-6">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-violet-50 text-violet-600">
-                <Bell size={20} />
+            <Link
+              href="/whatsapp"
+              className="flex w-full items-center gap-3 p-5 text-left sm:p-6"
+            >
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-green-50 text-green-700">
+                <MessageCircle size={20} />
               </span>
               <span className="flex-1">
                 <span className="block font-bold text-slate-800">
-                  Notifications
+                  WhatsApp assistant
                 </span>
                 <span className="mt-0.5 block text-sm text-slate-400">
-                  Manage booking and reminder alerts
+                  {whatsapp.mode === "meta"
+                    ? `Connected to WhatsApp${whatsapp.displayNumber ? ` · ${whatsapp.displayNumber}` : ""}`
+                    : "Demo mode: messages are simulated, nothing is sent"}
                 </span>
               </span>
               <ChevronRight className="text-slate-400" size={20} />
-            </button>
-            <div className="border-t border-slate-100">
-              <button className="flex w-full items-center gap-3 p-5 text-left sm:p-6">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-amber-600">
-                  <LockKeyhole size={20} />
-                </span>
-                <span className="flex-1">
-                  <span className="block font-bold text-slate-800">
-                    Password & security
-                  </span>
-                  <span className="mt-0.5 block text-sm text-slate-400">
-                    Keep your account secure
-                  </span>
-                </span>
-                <ChevronRight className="text-slate-400" size={20} />
-              </button>
-            </div>
+            </Link>
           </section>
         </div>
       </div>

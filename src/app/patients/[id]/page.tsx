@@ -15,6 +15,7 @@ import {
 } from "@/lib/appointments/view-models";
 import { PatientDetailClient } from "./components/PatientDetailClient";
 import { getPatientFollowUps } from "@/lib/database/followUps";
+import { listMessagesForPatient } from "@/lib/whatsapp/messages";
 
 export default async function PatientDetailPage({
   params,
@@ -22,7 +23,7 @@ export default async function PatientDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const doctorId = getCurrentDoctorId();
+  const doctorId = (await getCurrentDoctorId());
 
   const patient = getPatientById(doctorId, id);
   if (!patient) notFound();
@@ -73,6 +74,7 @@ export default async function PatientDetailPage({
         patient={patient}
         initialAppointments={appointments}
         initialFollowUps={getPatientFollowUps(doctorId, id)}
+        messages={listMessagesForPatient(doctorId, id)}
       />
     </main>
   );

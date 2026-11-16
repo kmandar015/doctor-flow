@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentDoctorId } from "@/lib/database/auth";
 import { updateAppointmentStatus } from "@/lib/database/appointments";
+import { notifyAppointmentStatus } from "@/lib/whatsapp/notify";
 import {
   appointmentStatuses,
   type AppointmentStatus,
@@ -30,7 +31,7 @@ export async function PATCH(
       { status: 400 },
     );
   const result = updateAppointmentStatus(
-    getCurrentDoctorId(),
+    (await getCurrentDoctorId()),
     (await params).id,
     body.status as AppointmentStatus,
   );
@@ -44,5 +45,6 @@ export async function PATCH(
       { error: `Cannot change ${result.currentStatus} to ${body.status}.` },
       { status: 409 },
     );
+  await notifyAppointmentStatus(result.appointment);
   return NextResponse.json({ appointment: result.appointment });
 }

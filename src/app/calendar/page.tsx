@@ -4,8 +4,10 @@ import { deriveColor, deriveInitials } from "@/lib/appointments/view-models";
 import { CalendarClient } from "./components/CalendarClient";
 import { getDoctorAvailability } from "@/lib/database/availability";
 
-export default function CalendarPage() {
-  const doctorId = getCurrentDoctorId();
+export const dynamic = "force-dynamic";
+
+export default async function CalendarPage() {
+  const doctorId = (await getCurrentDoctorId());
   const raw = listAppointments(doctorId);
   const availability = getDoctorAvailability(doctorId) || {
     doctorId,

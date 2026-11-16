@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef, useEffect } from "react";
+import { formatPhone } from "@/lib/phone";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, Search, X } from "lucide-react";
 import { useToast } from "./ToastContext";
@@ -91,7 +92,7 @@ export function NewBookingDrawer({
     if (preselectedPatient && open) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedPatient(preselectedPatient);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setForm((prev) => ({
         ...prev,
         patientName: preselectedPatient.name,
@@ -103,7 +104,7 @@ export function NewBookingDrawer({
     } else if (!open) {
       handleClearPatient();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [preselectedPatient, open]);
 
   if (!open) return null;
@@ -339,7 +340,7 @@ export function NewBookingDrawer({
                               {p.name}
                             </span>
                             <span className="text-xs text-slate-400">
-                              {p.phone}
+                              {formatPhone(p.phone)}
                             </span>
                           </button>
                         ))}
@@ -367,7 +368,7 @@ export function NewBookingDrawer({
                       {selectedPatient.name}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {selectedPatient.phone}
+                      {formatPhone(selectedPatient.phone)}
                     </p>
                   </div>
                   {!preselectedPatient && (

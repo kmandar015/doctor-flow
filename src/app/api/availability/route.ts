@@ -9,7 +9,7 @@ import { DoctorAvailability } from "@/lib/database/types";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const doctorId = getCurrentDoctorId();
+  const doctorId = (await getCurrentDoctorId());
   const availability = getDoctorAvailability(doctorId);
 
   if (!availability) {
@@ -87,7 +87,7 @@ export async function PUT(request: NextRequest) {
   }
 
   const availability: DoctorAvailability = {
-    doctorId: getCurrentDoctorId(),
+    doctorId: (await getCurrentDoctorId()),
     workingDays: workingDays as number[],
     workStart: workStart as string,
     workEnd: workEnd as string,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentDoctorId } from "@/lib/database/auth";
+import { normalizePhone } from "@/lib/phone";
 import {
   createAppointment,
   listAppointments,
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
     );
   }
   return NextResponse.json({
-    appointments: listAppointments(getCurrentDoctorId(), {
+    appointments: listAppointments((await getCurrentDoctorId()), {
       status: status as AppointmentStatus | undefined,
       date: date ?? undefined,
       from: from ?? undefined,
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     typeof patient.name !== "string" ||
     !patient.name.trim() ||
     typeof patient.phone !== "string" ||
-    !patient.phone.trim() ||
+    !normalizePhone(patient.phone) ||
     typeof input.appointmentDate !== "string" ||
     !datePattern.test(input.appointmentDate) ||
     typeof input.appointmentTime !== "string" ||
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "Patient name, phone, a valid date, and a valid time are required.",
+          "Patient name, a valid phone number, a valid date, and a valid time are required.",
       },
       { status: 400 },
     );
@@ -95,10 +96,10 @@ export async function POST(request: NextRequest) {
   const text = (value: unknown) =>
     typeof value === "string" ? value.trim() || undefined : undefined;
   try {
-    const appointment = createAppointment(getCurrentDoctorId(), {
+    const appointment = createAppointment((await getCurrentDoctorId()), {
       patient: {
         name: patient.name.trim(),
-        phone: patient.phone.trim(),
+        phone: normalizePhone(patient.phone)!,
         email: text(patient.email),
         dateOfBirth: text(patient.dateOfBirth),
         gender: text(patient.gender),

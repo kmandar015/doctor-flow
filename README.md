@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DoctorFlow
 
-## Getting Started
+A practice dashboard for doctors (appointments, calendar, patients, follow-ups, reports),
+plus a **WhatsApp assistant** that lets patients book, check and cancel appointments and
+receive confirmations and reminders. Patients get no website; WhatsApp is their
+interface.
 
-First, run the development server:
+Next.js 15 (App Router) · SQLite via Node's built-in `node:sqlite` · Tailwind CSS.
+
+## Run it
+
+Requires **Node.js 22.13+**.
 
 ```bash
+npm install
+cp .env.example .env.local   # then fill in AUTH_SECRET and DOCTORFLOW_DEMO_PASSWORD
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open <http://localhost:3000> and sign in as `meera.shah@doctorflow.test` with the password
+from `DOCTORFLOW_DEMO_PASSWORD`. The database (`data/doctorflow.sqlite`) is created and
+filled with demo data on first start. Delete or rename it to start fresh.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+WhatsApp starts in **demo mode**: open **WhatsApp** in the sidebar and play a patient.
+To use real WhatsApp, follow [docs/WhatsApp_Setup_Guide.md](docs/WhatsApp_Setup_Guide.md).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Docs
 
-## Learn More
+- [Demo script](docs/Demo_Script.md)
+- [WhatsApp setup](docs/WhatsApp_Setup_Guide.md)
+- [Deployment plan](docs/Deployment_Plan.md)
+- Daily reports: `docs/day-3-changes.md` … `docs/Day9_Implementation_Report.md`
+- API collection: `docs/DoctorFlow.postman_collection.json`
 
-To learn more about Next.js, take a look at the following resources:
+## Checks
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx tsc --noEmit
+npm run lint
+npm run build
+```

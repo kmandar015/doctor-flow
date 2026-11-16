@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { todayISO } from "@/lib/dates";
 import type { FollowUp } from "@/lib/database/types";
 import { formatDate } from "@/lib/appointments/view-models";
 import { MoreHorizontal } from "lucide-react";
@@ -120,14 +121,14 @@ export function FollowUpsClient({
                         : followUp.status === "CANCELLED"
                           ? "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-600/20"
                           : followUp.followUpDate <
-                              new Date().toISOString().slice(0, 10)
+                              todayISO()
                             ? "bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20" // Overdue
                             : "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/10"
                     }`}
                   >
                     {followUp.status === "PENDING" &&
                     followUp.followUpDate <
-                      new Date().toISOString().slice(0, 10)
+                      todayISO()
                       ? "OVERDUE"
                       : followUp.status}
                   </span>

@@ -11,6 +11,7 @@ import type { UiAppointment } from "@/lib/appointments/view-models";
 import { AppointmentAvatar } from "../../dashboard/components/AppointmentAvatar";
 import { AppointmentDetail } from "../../components/AppointmentDetail";
 import { NewBookingDrawer } from "../../components/NewBookingDrawer";
+import { SourceBadge } from "../../components/SourceBadge";
 
 // ─── Filter options ───────────────────────────────────────────────────────────
 
@@ -132,8 +133,9 @@ export function BookingsClient({
                   size="sm"
                 />
                 <div>
-                  <p className="text-sm font-semibold text-slate-700">
+                  <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-700">
                     {booking.patient}
+                    <SourceBadge source={booking.source} />
                   </p>
                   <p className="mt-0.5 text-xs text-slate-400">
                     {booking.id} · {booking.age} yrs

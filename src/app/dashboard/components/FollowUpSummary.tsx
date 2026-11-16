@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { todayISO } from "@/lib/dates";
 import { ArrowRight, CalendarDays, Clock, AlertTriangle } from "lucide-react";
 import type { FollowUp } from "@/lib/database/types";
 
 export function FollowUpSummary({ followUps }: { followUps: FollowUp[] }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
 
   const todayCount = followUps.filter(
     (f) => f.followUpDate === today && f.status === "PENDING",

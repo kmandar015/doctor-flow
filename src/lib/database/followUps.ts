@@ -1,4 +1,5 @@
 import "server-only";
+import { todayISO } from "@/lib/dates";
 
 import { randomUUID } from "node:crypto";
 import { getDatabase } from "./db";
@@ -53,7 +54,7 @@ export function listFollowUps(
 ) {
   const clauses = ["f.doctor_id = ?"];
   const values: string[] = [doctorId];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
 
   if (filters.status) {
     clauses.push("f.status = ?");
@@ -217,11 +218,12 @@ export function updateFollowUp(
   }
 
   db.prepare(
-    "UPDATE follow_ups SET follow_up_date = COALESCE(?, follow_up_date), reason = COALESCE(?, reason), notes = COALESCE(?, notes), updated_at = ? WHERE id = ? AND doctor_id = ?",
+    "UPDATE follow_ups SET follow_up_date = COALESCE(?, follow_up_date), reason = COALESCE(?, reason), notes = COALESCE(?, notes), reminder_sent_at = CASE WHEN ? != follow_up_date THEN NULL ELSE reminder_sent_at END, updated_at = ? WHERE id = ? AND doctor_id = ?",
   ).run(
     data.followUpDate ?? followUp.followUpDate,
     data.reason !== undefined ? data.reason : followUp.reason,
     data.notes !== undefined ? data.notes : followUp.notes,
+    data.followUpDate ?? followUp.followUpDate,
     now,
     id,
     doctorId,

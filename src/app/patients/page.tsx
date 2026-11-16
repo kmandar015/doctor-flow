@@ -2,8 +2,10 @@ import { listPatientsWithStats } from "@/lib/database/patients";
 import { getCurrentDoctorId } from "@/lib/database/auth";
 import { PatientsClient } from "./components/PatientsClient";
 
-export default function PatientsPage() {
-  const patients = listPatientsWithStats(getCurrentDoctorId());
+export const dynamic = "force-dynamic";
+
+export default async function PatientsPage() {
+  const patients = listPatientsWithStats((await getCurrentDoctorId()));
 
   return (
     <main className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8 lg:px-10">

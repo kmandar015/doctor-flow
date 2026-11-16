@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const doctorId = getCurrentDoctorId();
+  const doctorId = (await getCurrentDoctorId());
   const patient = getPatientById(doctorId, id);
   if (!patient) {
     return NextResponse.json({ error: "Patient not found." }, { status: 404 });
@@ -44,7 +44,7 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const doctorId = getCurrentDoctorId();
+  const doctorId = (await getCurrentDoctorId());
   const input = body as Record<string, unknown>;
 
   const text = (v: unknown) =>

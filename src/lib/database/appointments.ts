@@ -1,4 +1,5 @@
 import "server-only";
+import { todayISO } from "@/lib/dates";
 
 import { randomUUID } from "node:crypto";
 import { getDatabase } from "./db";
@@ -179,7 +180,7 @@ export function createAppointment(
 }
 
 const validTransitions: Record<AppointmentStatus, AppointmentStatus[]> = {
-  PENDING: ["CONFIRMED", "CANCELLED"],
+  PENDING: ["CONFIRMED", "REJECTED", "CANCELLED"],
   CONFIRMED: ["COMPLETED", "CANCELLED"],
   REJECTED: [],
   COMPLETED: [],
@@ -216,7 +217,7 @@ export function hasConflict(
   excludeId?: string,
 ) {
   let query =
-    "SELECT id FROM appointments WHERE doctor_id = ? AND appointment_date = ? AND appointment_time = ? AND status != 'CANCELLED'";
+    "SELECT id FROM appointments WHERE doctor_id = ? AND appointment_date = ? AND appointment_time = ? AND status NOT IN ('CANCELLED', 'REJECTED')";
   const params = [doctorId, date, time];
   if (excludeId) {
     query += " AND id != ?";
@@ -248,7 +249,7 @@ export function rescheduleAppointment(
 
   getDatabase()
     .prepare(
-      "UPDATE appointments SET appointment_date = ?, appointment_time = ?, updated_at = ? WHERE id = ? AND doctor_id = ?",
+      "UPDATE appointments SET appointment_date = ?, appointment_time = ?, reminder_sent_at = NULL, updated_at = ? WHERE id = ? AND doctor_id = ?",
     )
     .run(
       appointmentDate,
@@ -264,37 +265,16 @@ export function rescheduleAppointment(
   };
 }
 
-export function listPatients(doctorId: string) {
-  return getDatabase()
-    .prepare(
-      `SELECT p.id, p.name, p.phone, p.email, p.date_of_birth AS dateOfBirth, p.gender,
-      p.address, p.notes,
-      MAX(a.appointment_date) AS lastVisit, COUNT(a.id) AS visits
-      FROM patients p JOIN appointments a ON a.patient_id = p.id
-      WHERE p.doctor_id = ? AND a.doctor_id = ?
-      GROUP BY p.id ORDER BY p.name`,
-    )
-    .all(doctorId, doctorId) as Array<{
-    id: string;
-    name: string;
-    phone: string;
-    email: string | null;
-    dateOfBirth: string | null;
-    gender: string | null;
-    address: string | null;
-    notes: string | null;
-    lastVisit: string;
-    visits: number;
-  }>;
-}
-
 export function getDashboardSummary(doctorId: string) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const appointments = listAppointments(doctorId);
-  const patients = listPatients(doctorId);
+  // Count every patient record, including walk-ins with no appointments yet.
+  const { count: patientsCount } = getDatabase()
+    .prepare("SELECT COUNT(*) AS count FROM patients WHERE doctor_id = ?")
+    .get(doctorId) as { count: number };
   return {
     appointments,
-    patientsCount: patients.length,
+    patientsCount,
     stats: {
       today: appointments.filter(
         (appointment) => appointment.appointmentDate === today,

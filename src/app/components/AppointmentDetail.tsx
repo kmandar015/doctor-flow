@@ -29,6 +29,7 @@ import {
 } from "@/lib/appointments/view-models";
 import { useToast } from "./ToastContext";
 import { FollowUpDrawer } from "./FollowUpDrawer";
+import { SourceBadge, sourceLabel } from "./SourceBadge";
 
 // ─── Status display helpers ───────────────────────────────────────────────────
 
@@ -362,7 +363,8 @@ export function AppointmentDetail({
                     className={`mt-1 inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${statusBadge[appointment.status]}`}
                   >
                     {statusLabel[appointment.status]}
-                  </span>
+                  </span>{" "}
+                  <SourceBadge source={appointment.source} />
                 </div>
               </div>
 
@@ -451,7 +453,7 @@ export function AppointmentDetail({
                       <DetailRow
                         icon={<Tag size={14} />}
                         label="Source"
-                        value={appointment.source}
+                        value={sourceLabel[appointment.source] ?? appointment.source}
                       />
                       <DetailRow
                         icon={<Calendar size={14} />}

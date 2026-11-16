@@ -9,6 +9,6 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   return NextResponse.json({
-    followUps: getPatientFollowUps(getCurrentDoctorId(), (await params).id),
+    followUps: getPatientFollowUps((await getCurrentDoctorId()), (await params).id),
   });
 }

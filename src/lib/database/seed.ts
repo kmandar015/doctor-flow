@@ -1,11 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
+import { addDaysISO, todayISO } from "@/lib/dates";
 
-const isoDate = (offsetDays: number) => {
-  const value = new Date();
-  value.setHours(0, 0, 0, 0);
-  value.setDate(value.getDate() + offsetDays);
-  return value.toISOString().slice(0, 10);
-};
+const isoDate = (offsetDays: number) => addDaysISO(todayISO(), offsetDays);
 
 export function seedDevelopmentDatabase(db: DatabaseSync) {
   const existing = db
@@ -167,6 +163,70 @@ export function seedDevelopmentDatabase(db: DatabaseSync) {
       "Follow-up consultation",
       "CANCELLED",
       "DASHBOARD",
+    ],
+    // Historical data for reporting
+    [
+      "appointment-aarav-past1",
+      "patient-aarav-mehta",
+      isoDate(-7),
+      "10:00",
+      "Blood test review",
+      "COMPLETED",
+      "DASHBOARD",
+    ],
+    [
+      "appointment-vikram-past1",
+      "patient-vikram-singh",
+      isoDate(-5),
+      "15:00",
+      "Regular checkup",
+      "COMPLETED",
+      "MANUAL",
+    ],
+    [
+      "appointment-priya-past1",
+      "patient-priya-patil",
+      isoDate(-10),
+      "11:00",
+      "Initial consultation",
+      "COMPLETED",
+      "DASHBOARD",
+    ],
+    [
+      "appointment-sunita-past1",
+      "patient-sunita-desai",
+      isoDate(-3),
+      "09:30",
+      "Diabetes review",
+      "COMPLETED",
+      "MANUAL",
+    ],
+    [
+      "appointment-rahul-past1",
+      "patient-rahul-sharma",
+      isoDate(-8),
+      "16:00",
+      "Cold and fever",
+      "COMPLETED",
+      "WHATSAPP",
+    ],
+    [
+      "appointment-neha-past1",
+      "patient-neha-kulkarni",
+      isoDate(-12),
+      "10:00",
+      "Skin rash treatment",
+      "COMPLETED",
+      "DASHBOARD",
+    ],
+    [
+      "appointment-aarav-cancelled1",
+      "patient-aarav-mehta",
+      isoDate(-4),
+      "14:00",
+      "Rescheduled by patient",
+      "CANCELLED",
+      "WHATSAPP",
     ],
   ];
   const insertAppointment = db.prepare(`INSERT INTO appointments

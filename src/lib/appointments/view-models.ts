@@ -36,6 +36,7 @@ export type UiAppointment = {
   time: string;
   date?: string;
   status: "Pending" | "Confirmed" | "Rejected" | "Completed" | "Cancelled";
+  source: Appointment["source"];
   color: (typeof colors)[number];
 };
 
@@ -64,6 +65,7 @@ export function toUiAppointment(appointment: Appointment): UiAppointment {
     status:
       `${appointment.status[0]}${appointment.status.slice(1).toLowerCase()}` as UiAppointment["status"],
     color: deriveColor(appointment.patient.name),
+    source: appointment.source,
   };
 }
 

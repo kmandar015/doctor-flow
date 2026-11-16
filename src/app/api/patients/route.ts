@@ -1,6 +1,8 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentDoctorId } from "@/lib/database/auth";
+import { normalizePhone } from "@/lib/phone";
+import { notifyWelcome } from "@/lib/whatsapp/notify";
 import {
   listPatientsWithStats,
   createPatient,
@@ -15,7 +17,7 @@ type Gender = (typeof validGenders)[number];
 
 export async function GET(request: NextRequest) {
   const search = request.nextUrl.searchParams.get("search") ?? undefined;
-  const doctorId = getCurrentDoctorId();
+  const doctorId = (await getCurrentDoctorId());
   const patients = listPatientsWithStats(doctorId, search);
   return NextResponse.json({ patients });
 }
@@ -60,9 +62,9 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
-  if (typeof input.phone !== "string" || !input.phone.trim()) {
+  if (typeof input.phone !== "string" || !normalizePhone(input.phone)) {
     return NextResponse.json(
-      { error: "Phone number is required." },
+      { error: "A valid phone number is required." },
       { status: 400 },
     );
   }
@@ -151,12 +153,12 @@ export async function POST(request: NextRequest) {
   const firstName = (input.firstName as string).trim();
   const lastName = (input.lastName as string).trim();
   const name = `${firstName} ${lastName}`;
-  const phone = (input.phone as string).trim();
+  const phone = normalizePhone(input.phone as string)!;
 
   const text = (v: unknown) =>
     typeof v === "string" && v.trim() ? v.trim() : undefined;
 
-  const doctorId = getCurrentDoctorId();
+  const doctorId = (await getCurrentDoctorId());
 
   try {
     const patient = createPatient(doctorId, {
@@ -168,6 +170,7 @@ export async function POST(request: NextRequest) {
       address: text(input.address),
       notes: text(input.notes),
     });
+    await notifyWelcome(patient);
     // Return as PatientWithStats shape (no appointments yet)
     return NextResponse.json(
       {

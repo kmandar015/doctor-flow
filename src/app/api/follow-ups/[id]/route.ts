@@ -14,7 +14,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const followUp = getFollowUpById(getCurrentDoctorId(), (await params).id);
+  const followUp = getFollowUpById((await getCurrentDoctorId()), (await params).id);
   if (!followUp) {
     return NextResponse.json(
       { error: "Follow-up not found." },
@@ -48,7 +48,7 @@ export async function PATCH(
     notes?: string;
   };
 
-  const doctorId = getCurrentDoctorId();
+  const doctorId = (await getCurrentDoctorId());
   let result;
 
   try {

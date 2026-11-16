@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { Appointment } from "../types";
 import { AppointmentAvatar } from "./AppointmentAvatar";
 import { useToast } from "@/app/components/ToastContext";
+import { SourceBadge } from "@/app/components/SourceBadge";
 
 export function PendingRequests({
   initialRequests,
@@ -93,8 +94,9 @@ export function PendingRequests({
                       · {request.age} yrs
                     </span>
                   </p>
-                  <p className="mt-1 text-sm text-slate-400">
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-400">
                     {request.reason}
+                    <SourceBadge source={request.source} />
                   </p>
                 </div>
               </div>

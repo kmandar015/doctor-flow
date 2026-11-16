@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getDatabase } from "./db";
+import { isPastSlot } from "@/lib/dates";
 import type { DoctorAvailability } from "./types";
 
 export function getDoctorAvailability(
@@ -83,10 +84,8 @@ export function checkSlot(
   const availability = getDoctorAvailability(doctorId);
   if (!availability) return "AVAILABLE"; // Default if not configured
 
-  // Check past
-  const now = new Date();
-  const slotDate = new Date(`${date}T${time}:00`);
-  if (slotDate < now) return "PAST";
+  // Check past (compared in the clinic's time zone)
+  if (isPastSlot(date, time)) return "PAST";
 
   // Check working day
   const dayOfWeek = new Date(`${date}T00:00:00`).getDay(); // 0 = Sunday, 1 = Monday
@@ -107,4 +106,64 @@ export function checkSlot(
   }
 
   return "AVAILABLE";
+}
+
+export const defaultAvailability = (doctorId: string): DoctorAvailability => ({
+  doctorId,
+  workingDays: [1, 2, 3, 4, 5],
+  workStart: "09:00",
+  workEnd: "17:00",
+  breakStart: null,
+  breakEnd: null,
+  slotDuration: 30,
+});
+
+/**
+ * Free `HH:MM` slots for a date: inside working hours, outside the break,
+ * not in the past, and not taken by an active appointment. Used by the
+ * dashboard's booking forms and by the WhatsApp assistant.
+ */
+export function getAvailableSlots(
+  doctorId: string,
+  date: string,
+  excludeAppointmentId?: string,
+): string[] {
+  const availability =
+    getDoctorAvailability(doctorId) ?? defaultAvailability(doctorId);
+
+  const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
+  if (!availability.workingDays.includes(dayOfWeek)) return [];
+
+  const booked = getDatabase()
+    .prepare(
+      `SELECT appointment_time AS time FROM appointments
+       WHERE doctor_id = ? AND appointment_date = ?
+         AND status NOT IN ('CANCELLED', 'REJECTED') AND id != ?`,
+    )
+    .all(doctorId, date, excludeAppointmentId ?? "") as Array<{ time: string }>;
+  const bookedTimes = new Set(booked.map((row) => row.time));
+
+  const slots: string[] = [];
+  let [hour, minute] = availability.workStart.split(":").map(Number);
+  const [endHour, endMinute] = availability.workEnd.split(":").map(Number);
+
+  while (hour < endHour || (hour === endHour && minute < endMinute)) {
+    const time = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    const isBreak =
+      !!availability.breakStart &&
+      !!availability.breakEnd &&
+      time >= availability.breakStart &&
+      time < availability.breakEnd;
+
+    if (!isBreak && !isPastSlot(date, time) && !bookedTimes.has(time)) {
+      slots.push(time);
+    }
+
+    minute += availability.slotDuration;
+    while (minute >= 60) {
+      hour += 1;
+      minute -= 60;
+    }
+  }
+  return slots;
 }

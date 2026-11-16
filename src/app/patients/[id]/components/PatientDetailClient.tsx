@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { todayISO } from "@/lib/dates";
 import { useRouter } from "next/navigation";
 import { Calendar, Clock, Tag } from "lucide-react";
 import { FollowUpDrawer } from "@/app/components/FollowUpDrawer";
@@ -8,6 +9,9 @@ import type { Patient, Appointment, FollowUp } from "@/lib/database/types";
 import { AppointmentDetail } from "@/app/components/AppointmentDetail";
 import { formatDate, formatTime } from "@/lib/appointments/view-models";
 import { useToast } from "@/app/components/ToastContext";
+import { WhatsAppBubble, type BubbleMessage } from "@/app/components/WhatsAppBubble";
+import { formatPhone } from "@/lib/phone";
+import Link from "next/link";
 
 // ─── Status helpers ────────────────────────────────────────────────────────────
 
@@ -33,10 +37,12 @@ export function PatientDetailClient({
   patient,
   initialAppointments,
   initialFollowUps = [],
+  messages = [],
 }: {
   patient: Patient;
   initialAppointments: Appointment[];
   initialFollowUps?: FollowUp[];
+  messages?: BubbleMessage[];
 }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -58,7 +64,7 @@ export function PatientDetailClient({
   const upcoming = initialAppointments.filter(
     (a) =>
       (a.status === "PENDING" || a.status === "CONFIRMED") &&
-      a.appointmentDate >= new Date().toISOString().slice(0, 10),
+      a.appointmentDate >= todayISO(),
   ).length;
 
   const handleSaveNotes = () => {
@@ -87,8 +93,11 @@ export function PatientDetailClient({
             <p className="mb-4 text-xs font-bold uppercase tracking-wide text-slate-400">
               Contact &amp; Info
             </p>
-            <dl className="grid gap-3 sm:grid-cols-2">
-              <InfoRow label="Phone" value={patient.phone} />
+            <dl className="grid gap-3 xl:grid-cols-2">
+              <InfoRow
+                label="Phone"
+                value={formatPhone(patient.phone)}
+              />
               {patient.email && <InfoRow label="Email" value={patient.email} />}
               {patient.dateOfBirth && (
                 <InfoRow
@@ -221,14 +230,14 @@ export function PatientDetailClient({
                             : followUp.status === "CANCELLED"
                               ? "bg-rose-50 text-rose-700"
                               : followUp.followUpDate <
-                                  new Date().toISOString().slice(0, 10)
+                                  todayISO()
                                 ? "bg-orange-50 text-orange-700"
                                 : "bg-blue-50 text-blue-700"
                         }`}
                       >
                         {followUp.status === "PENDING" &&
                         followUp.followUpDate <
-                          new Date().toISOString().slice(0, 10)
+                          todayISO()
                           ? "OVERDUE"
                           : followUp.status}
                       </span>
@@ -264,6 +273,32 @@ export function PatientDetailClient({
                 color="text-slate-400"
               />
             </div>
+          </section>
+
+          {/* WhatsApp */}
+          <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                WhatsApp
+              </p>
+              <Link
+                href={`/whatsapp?phone=${encodeURIComponent(patient.phone)}`}
+                className="text-xs font-semibold text-brand hover:text-teal-900"
+              >
+                Open chat
+              </Link>
+            </div>
+            {messages.length === 0 ? (
+              <p className="py-4 text-center text-sm text-slate-400">
+                No WhatsApp messages yet.
+              </p>
+            ) : (
+              <div className="max-h-[420px] space-y-2 overflow-y-auto rounded-xl bg-[#efeae2] p-3">
+                {messages.slice(-8).map((m) => (
+                  <WhatsAppBubble key={m.id} message={m} compact />
+                ))}
+              </div>
+            )}
           </section>
         </div>
       </div>

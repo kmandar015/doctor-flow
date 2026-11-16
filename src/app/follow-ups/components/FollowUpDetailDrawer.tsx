@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { todayISO } from "@/lib/dates";
 import {
   X,
   Calendar,
@@ -143,14 +144,14 @@ export function FollowUpDetailDrawer({
                             : followUp.status === "CANCELLED"
                               ? "bg-rose-50 text-rose-700"
                               : followUp.followUpDate <
-                                  new Date().toISOString().slice(0, 10)
+                                  todayISO()
                                 ? "bg-orange-50 text-orange-700"
                                 : "bg-blue-50 text-blue-700"
                         }`}
                       >
                         {followUp.status === "PENDING" &&
                         followUp.followUpDate <
-                          new Date().toISOString().slice(0, 10)
+                          todayISO()
                           ? "OVERDUE"
                           : followUp.status}
                       </span>

@@ -26,7 +26,7 @@ export function PatientDetailDrawer({
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPatient(null);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setError(null);
     fetch(`/api/patients/${patientId}`)
       .then((res) => {

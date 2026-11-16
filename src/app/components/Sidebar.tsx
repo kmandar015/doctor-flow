@@ -1,11 +1,13 @@
 "use client";
 
 import {
+  BarChart3,
   CalendarDays,
   ChevronLeft,
   ClipboardList,
   LayoutDashboard,
   Menu,
+  MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
@@ -17,6 +19,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import type { FrameDoctor } from "./AppFrame";
 
 const items = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
@@ -24,14 +27,18 @@ const items = [
   { label: "Calendar", icon: CalendarDays, href: "/calendar" },
   { label: "Patients", icon: Users, href: "/patients" },
   { label: "Follow-ups", icon: ClipboardList, href: "/follow-ups" },
+  { label: "WhatsApp", icon: MessageCircle, href: "/whatsapp" },
+  { label: "Reports", icon: BarChart3, href: "/reports" },
   { label: "Availability", icon: Clock, href: "/availability" },
   { label: "My Account", icon: Settings, href: "/account" },
 ];
 
 export function Sidebar({
+  doctor,
   collapsed,
   onToggle,
 }: {
+  doctor: FrameDoctor;
   collapsed: boolean;
   onToggle: () => void;
 }) {
@@ -120,12 +127,12 @@ export function Sidebar({
               className={`flex items-center ${collapsed ? "justify-center" : "gap-3"}`}
             >
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-teal-100 text-sm font-bold text-brand">
-                DM
+                {doctor.initials}
               </div>
               <div className={`min-w-0 ${collapsed ? "hidden" : ""}`}>
-                <p className="truncate text-sm font-semibold">Dr. Meera Shah</p>
+                <p className="truncate text-sm font-semibold">{doctor.name}</p>
                 <p className="mt-0.5 text-xs text-teal-50/55">
-                  General Physician
+                  {doctor.specialization}
                 </p>
               </div>
               {!collapsed && (

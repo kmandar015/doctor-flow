@@ -1,4 +1,5 @@
 import "server-only";
+import { todayISO } from "@/lib/dates";
 
 import { randomUUID } from "node:crypto";
 import { getDatabase } from "./db";
@@ -87,10 +88,18 @@ function toAppointment(row: AppointmentRow, patient: Patient): Appointment {
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
+/** LIKE pattern; phone-looking searches drop spaces/dashes to match E.164. */
+function searchPattern(search: string) {
+  const term = search.trim();
+  return /^[-+0-9 ()]+$/.test(term)
+    ? `%${term.replace(/[^0-9]/g, "")}%`
+    : `%${term}%`;
+}
+
 export function getPatients(doctorId: string, search?: string): Patient[] {
   const db = getDatabase();
   if (search && search.trim()) {
-    const pattern = `%${search.trim()}%`;
+    const pattern = searchPattern(search);
     return (
       db
         .prepare(
@@ -246,8 +255,8 @@ export function listPatientsWithStats(
   doctorId: string,
   search?: string,
 ): PatientWithStats[] {
-  const today = new Date().toISOString().slice(0, 10);
-  const searchArg = search && search.trim() ? `%${search.trim()}%` : null;
+  const today = todayISO();
+  const searchArg = search && search.trim() ? searchPattern(search) : null;
   const rows = getDatabase()
     .prepare(
       `SELECT p.*,

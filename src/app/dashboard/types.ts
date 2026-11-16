@@ -10,6 +10,7 @@ export type Appointment = {
   date?: string;
   status: AppointmentStatus;
   color: "peach" | "violet" | "blue" | "green";
+  source?: "WHATSAPP" | "DASHBOARD" | "MANUAL";
 };
 
 export type Stat = {

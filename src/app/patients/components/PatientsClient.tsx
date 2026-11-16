@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { formatPhone } from "@/lib/phone";
 import { Search, UserPlus, MoreHorizontal } from "lucide-react";
 import type { PatientWithStats } from "@/lib/database/patients";
 import { AppointmentAvatar } from "@/app/dashboard/components/AppointmentAvatar";
@@ -159,7 +160,7 @@ export function PatientsClient({
                   </div>
 
                   {/* Phone */}
-                  <p className="text-sm text-slate-500">{patient.phone}</p>
+                  <p className="text-sm text-slate-500">{formatPhone(patient.phone)}</p>
 
                   {/* Last appointment */}
                   <p className="text-sm text-slate-500">

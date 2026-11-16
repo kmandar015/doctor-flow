@@ -8,13 +8,14 @@ export async function GET(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const appointment = getAppointment(getCurrentDoctorId(), (await params).id);
+  const appointment = getAppointment((await getCurrentDoctorId()), (await params).id);
   return appointment
     ? NextResponse.json({ appointment })
     : NextResponse.json({ error: "Appointment not found." }, { status: 404 });
 }
 
 import { rescheduleAppointment } from "@/lib/database/appointments";
+import { notifyRescheduled } from "@/lib/whatsapp/notify";
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -48,7 +49,7 @@ export async function PATCH(
   }
 
   const result = rescheduleAppointment(
-    getCurrentDoctorId(),
+    (await getCurrentDoctorId()),
     (await params).id,
     appointmentDate,
     appointmentTime,
@@ -81,5 +82,6 @@ export async function PATCH(
     );
   }
 
+  if (result.kind === "updated") await notifyRescheduled(result.appointment);
   return NextResponse.json({ appointment: result.appointment });
 }

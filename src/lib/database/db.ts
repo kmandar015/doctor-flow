@@ -4,6 +4,8 @@ import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { seedDevelopmentDatabase } from "./seed";
+import { hashPassword } from "@/lib/auth/password";
+import { normalizePhone } from "@/lib/phone";
 
 let database: DatabaseSync | undefined;
 
@@ -102,14 +104,103 @@ function migrate(db: DatabaseSync) {
   } catch {
     // ignore
   }
+
+  // ── Day 9: login, WhatsApp and reminders ──────────────────────────────────
+  addColumnIfMissing(db, "doctors", "password_hash", "TEXT");
+  addColumnIfMissing(db, "appointments", "reminder_sent_at", "TEXT");
+  addColumnIfMissing(db, "follow_ups", "reminder_sent_at", "TEXT");
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS whatsapp_sessions (
+      doctor_id TEXT NOT NULL REFERENCES doctors(id),
+      phone TEXT NOT NULL,
+      step TEXT NOT NULL,
+      data TEXT NOT NULL DEFAULT '{}',
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (doctor_id, phone)
+    );
+    CREATE TABLE IF NOT EXISTS whatsapp_messages (
+      id TEXT PRIMARY KEY,
+      doctor_id TEXT NOT NULL REFERENCES doctors(id),
+      patient_id TEXT REFERENCES patients(id),
+      phone TEXT NOT NULL,
+      direction TEXT NOT NULL CHECK(direction IN ('IN','OUT')),
+      kind TEXT NOT NULL,
+      body TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('RECEIVED','SENT','FAILED','SIMULATED')),
+      provider_message_id TEXT,
+      error TEXT,
+      appointment_id TEXT REFERENCES appointments(id),
+      follow_up_id TEXT REFERENCES follow_ups(id),
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS whatsapp_messages_doctor_idx ON whatsapp_messages(doctor_id, created_at);
+    CREATE INDEX IF NOT EXISTS whatsapp_messages_phone_idx ON whatsapp_messages(doctor_id, phone);
+    CREATE UNIQUE INDEX IF NOT EXISTS whatsapp_messages_provider_idx
+      ON whatsapp_messages(provider_message_id) WHERE provider_message_id IS NOT NULL;
+  `);
+}
+
+function addColumnIfMissing(
+  db: DatabaseSync,
+  table: string,
+  column: string,
+  definition: string,
+) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{
+    name: string;
+  }>;
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+/**
+ * Stores every patient phone as E.164 (`+919876543210`) so numbers typed in
+ * the dashboard match the numbers WhatsApp sends. Runs on every start, but
+ * only touches rows that are not normalized yet.
+ */
+function normalizeStoredPhones(db: DatabaseSync) {
+  const rows = db
+    .prepare("SELECT id, phone FROM patients WHERE phone NOT GLOB '+[0-9]*' OR phone GLOB '*[^+0-9]*'")
+    .all() as Array<{ id: string; phone: string }>;
+  const update = db.prepare("UPDATE patients SET phone = ? WHERE id = ?");
+  for (const row of rows) {
+    const normalized = normalizePhone(row.phone);
+    if (!normalized || normalized === row.phone) continue;
+    try {
+      update.run(normalized, row.id);
+    } catch {
+      // A normalized duplicate already exists for this doctor; leave as is.
+    }
+  }
+}
+
+/** Gives the demo doctor a password from env so the login screen works. */
+function ensureDemoCredentials(db: DatabaseSync) {
+  const password = process.env.DOCTORFLOW_DEMO_PASSWORD;
+  if (!password) return;
+  db.prepare(
+    "UPDATE doctors SET password_hash = ? WHERE id = ? AND password_hash IS NULL",
+  ).run(hashPassword(password), "doctor-meera-shah");
+}
+
+/** SQLite file location; override with DATABASE_PATH (e.g. a mounted volume). */
+function databasePath() {
+  return (
+    process.env.DATABASE_PATH || join(process.cwd(), "data", "doctorflow.sqlite")
+  );
 }
 
 export function getDatabase() {
   if (database) return database;
-  const path = join(process.cwd(), "data", "doctorflow.sqlite");
+  const path = databasePath();
   mkdirSync(dirname(path), { recursive: true });
   database = new DatabaseSync(path);
+  database.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
   migrate(database);
   seedDevelopmentDatabase(database);
+  normalizeStoredPhones(database);
+  ensureDemoCredentials(database);
   return database;
 }

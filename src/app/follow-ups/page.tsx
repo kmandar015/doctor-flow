@@ -4,8 +4,8 @@ import { listFollowUps } from "@/lib/database/followUps";
 
 export const dynamic = "force-dynamic";
 
-export default function FollowUpsPage() {
-  const followUps = listFollowUps(getCurrentDoctorId());
+export default async function FollowUpsPage() {
+  const followUps = listFollowUps((await getCurrentDoctorId()));
 
   return (
     <main className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8 lg:px-10">
