@@ -99,29 +99,32 @@ export function Sidebar({
             )}
           </button>
           <p
-            className={`mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.13em] text-teal-100/45 ${collapsed ? "sr-only" : ""}`}
+            className={`mb-3 shrink-0 px-3 text-[11px] font-semibold uppercase tracking-[0.13em] text-teal-100/45 ${collapsed ? "sr-only" : ""}`}
           >
             Main menu
           </p>
-          <nav className="space-y-1.5">
-            {items.map(({ label, icon: Icon, href }) => {
-              const active = pathname === href;
-              return (
-                <Link
-                  title={collapsed ? label : undefined}
-                  onClick={() => setOpen(false)}
-                  key={label}
-                  href={href}
-                  className={`flex items-center rounded-xl py-3 text-sm font-medium transition ${collapsed ? "justify-center px-3" : "gap-3 px-3"} ${active ? "bg-white/13 text-white shadow-sm" : "text-teal-50/65 hover:bg-white/10 hover:text-white"}`}
-                >
-                  <Icon size={19} strokeWidth={active ? 2.4 : 2} />
-                  <span className={collapsed ? "hidden" : ""}>{label}</span>
-                </Link>
-              );
-            })}
-          </nav>
+          {/* Only the links scroll on short screens; logo, title and doctor card stay put. */}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <nav className="space-y-1.5">
+              {items.map(({ label, icon: Icon, href }) => {
+                const active = pathname === href;
+                return (
+                  <Link
+                    title={collapsed ? label : undefined}
+                    onClick={() => setOpen(false)}
+                    key={label}
+                    href={href}
+                    className={`flex items-center rounded-xl py-3 text-sm font-medium transition ${collapsed ? "justify-center px-3" : "gap-3 px-3"} ${active ? "bg-white/13 text-white shadow-sm" : "text-teal-50/65 hover:bg-white/10 hover:text-white"}`}
+                  >
+                    <Icon size={19} strokeWidth={active ? 2.4 : 2} />
+                    <span className={collapsed ? "hidden" : ""}>{label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
           <div
-            className={`mt-auto rounded-2xl bg-white/10 ${collapsed ? "p-2" : "p-4"}`}
+            className={`mt-4 shrink-0 rounded-2xl bg-white/10 ${collapsed ? "p-2" : "p-4"}`}
           >
             <div
               className={`flex items-center ${collapsed ? "justify-center" : "gap-3"}`}
