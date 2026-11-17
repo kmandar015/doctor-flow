@@ -137,9 +137,11 @@ export function BookingsClient({
                     {booking.patient}
                     <SourceBadge source={booking.source} />
                   </p>
-                  <p className="mt-0.5 text-xs text-slate-400">
-                    {booking.id} · {booking.age} yrs
-                  </p>
+                  {booking.age > 0 && (
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      {booking.age} yrs
+                    </p>
+                  )}
                 </div>
               </div>
 

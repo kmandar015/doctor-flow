@@ -89,10 +89,12 @@ export function PendingRequests({
                 />
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-slate-700">
-                    {request.patient}{" "}
-                    <span className="font-normal text-slate-400">
-                      · {request.age} yrs
-                    </span>
+                    {request.patient}
+                    {request.age > 0 && (
+                      <span className="font-normal text-slate-400">
+                        {" "}· {request.age} yrs
+                      </span>
+                    )}
                   </p>
                   <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-400">
                     {request.reason}
