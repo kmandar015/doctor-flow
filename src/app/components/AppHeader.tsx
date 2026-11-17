@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, LogOut, MessageCircle, Settings } from "lucide-react";
+import { ChevronDown, LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -39,15 +39,6 @@ export function AppHeader({ doctor }: { doctor: FrameDoctor }) {
   return (
     <header className="sticky top-0 z-30 flex h-[78px] items-center justify-end border-b border-slate-200/80 bg-white/90 px-5 backdrop-blur md:px-8">
       <div className="flex items-center gap-3 sm:gap-5">
-        <Link
-          href="/whatsapp"
-          aria-label="WhatsApp messages"
-          title="WhatsApp messages"
-          className="grid h-10 w-10 place-items-center rounded-full bg-slate-50 text-slate-600 hover:text-brand"
-        >
-          <MessageCircle size={20} />
-        </Link>
-        <div className="hidden h-8 w-px bg-slate-200 sm:block" />
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen((open) => !open)}
