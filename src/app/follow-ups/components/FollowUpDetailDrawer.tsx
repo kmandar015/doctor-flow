@@ -247,6 +247,8 @@ export function FollowUpDetailDrawer({
             id: followUp.patient.id,
             name: followUp.patient.name,
             phone: followUp.patient.phone,
+            dateOfBirth: followUp.patient.dateOfBirth,
+            gender: followUp.patient.gender,
           }}
           onSuccess={() => {
             handleStatusUpdate("COMPLETED");

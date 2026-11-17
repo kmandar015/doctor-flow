@@ -1,44 +1,62 @@
 "use client";
 
-import { useState, useTransition, useRef, useEffect } from "react";
-import { formatPhone } from "@/lib/phone";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, Search, X } from "lucide-react";
-import { useToast } from "./ToastContext";
+import {
+  AlertTriangle,
+  CalendarPlus,
+  CheckCircle2,
+  ChevronDown,
+  X,
+} from "lucide-react";
+import { formatPhone, normalizePhone } from "@/lib/phone";
+import { addDaysISO, todayISO } from "@/lib/dates";
+import {
+  deriveAge,
+  formatDate,
+  formatTime,
+} from "@/lib/appointments/view-models";
 import type { PatientWithStats } from "@/lib/database/patients";
+import { useToast } from "./ToastContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type PatientMode = "search" | "new";
-
-type FormState = {
-  patientName: string;
-  patientPhone: string;
-  patientEmail: string;
-  patientDob: string;
-  patientGender: string;
-  appointmentDate: string;
-  appointmentTime: string;
-  reason: string;
-  notes: string;
+type PreselectedPatient = {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
 };
 
-type FieldErrors = Partial<Record<keyof FormState, string>>;
+type ChosenPatient = Pick<
+  PatientWithStats,
+  "id" | "name" | "phone" | "dateOfBirth" | "gender"
+>;
 
-const emptyForm: FormState = {
-  patientName: "",
-  patientPhone: "",
-  patientEmail: "",
-  patientDob: "",
-  patientGender: "",
-  appointmentDate: "",
-  appointmentTime: "",
-  reason: "",
-  notes: "",
+type When = "now" | "later";
+
+type FieldErrors = Partial<
+  Record<"name" | "phone" | "age" | "gender" | "date" | "time", string>
+>;
+
+type Booked = {
+  name: string;
+  date: string;
+  time: string;
+  overlaps: Array<{ name: string; time: string }>;
 };
+
+const GENDERS = ["Male", "Female", "Other"] as const;
+const REASONS = ["Fever", "Consultation", "Follow-up", "Review"] as const;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+/**
+ * Books an appointment from the dashboard. Built for a patient standing at
+ * the desk: type a phone number or name, pick "Now", book.
+ */
 export function NewBookingDrawer({
   open,
   onClose,
@@ -47,188 +65,238 @@ export function NewBookingDrawer({
 }: {
   open: boolean;
   onClose: () => void;
-  preselectedPatient?: {
-    id: string;
-    name: string;
-    phone: string;
-    email?: string | null;
-    dateOfBirth?: string | null;
-    gender?: string | null;
-  };
+  preselectedPatient?: PreselectedPatient;
+  /** When given, it runs after booking instead of the "Book another" screen. */
   onSuccess?: () => void;
+}) {
+  // A new key gives a fresh, empty form for "Book another".
+  const [formKey, setFormKey] = useState(0);
+  if (!open) return null;
+  return (
+    <BookingForm
+      key={formKey}
+      onClose={onClose}
+      preselectedPatient={preselectedPatient}
+      onSuccess={onSuccess}
+      onBookAnother={() => setFormKey((key) => key + 1)}
+    />
+  );
+}
+
+function BookingForm({
+  onClose,
+  preselectedPatient,
+  onSuccess,
+  onBookAnother,
+}: {
+  onClose: () => void;
+  preselectedPatient?: PreselectedPatient;
+  onSuccess?: () => void;
+  onBookAnother: () => void;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<FieldErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [booked, setBooked] = useState<Booked | null>(null);
+
+  // Patient
+  const [chosen, setChosen] = useState<ChosenPatient | null>(
+    preselectedPatient
+      ? {
+          id: preselectedPatient.id,
+          name: preselectedPatient.name,
+          phone: preselectedPatient.phone,
+          dateOfBirth: preselectedPatient.dateOfBirth ?? null,
+          gender: preselectedPatient.gender ?? null,
+        }
+      : null,
+  );
+  // The same details the WhatsApp assistant asks a new patient for.
+  const [phone, setPhone] = useState("");
+  const [name, setName] = useState("");
+  const [matches, setMatches] = useState<PatientWithStats[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [age, setAge] = useState("");
+  const [gender, setGender] = useState("");
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequest = useRef(0);
+
+  // When
+  const today = todayISO();
+  const tomorrow = addDaysISO(today, 1);
+  const [when, setWhen] = useState<When>(preselectedPatient ? "later" : "now");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [slots, setSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
-  // Patient search state
-  const [patientMode, setPatientMode] = useState<PatientMode>("search");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<PatientWithStats[]>([]);
-  const [selectedPatient, setSelectedPatient] = useState<
-    PatientWithStats | typeof preselectedPatient | null
-  >(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Details
+  const [reason, setReason] = useState("");
+  const [showMore, setShowMore] = useState(false);
+  const [email, setEmail] = useState("");
+  const [notes, setNotes] = useState("");
 
-  const handleClearPatient = () => {
-    setSelectedPatient(null);
-    setForm((prev) => ({
-      ...prev,
-      patientName: "",
-      patientPhone: "",
-      patientEmail: "",
-      patientDob: "",
-      patientGender: "",
-    }));
-  };
+  useEffect(
+    () => () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    },
+    [],
+  );
 
-  useEffect(() => {
-    if (preselectedPatient && open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelectedPatient(preselectedPatient);
-       
-      setForm((prev) => ({
-        ...prev,
-        patientName: preselectedPatient.name,
-        patientPhone: preselectedPatient.phone,
-        patientEmail: preselectedPatient.email ?? "",
-        patientDob: preselectedPatient.dateOfBirth ?? "",
-        patientGender: preselectedPatient.gender ?? "",
-      }));
-    } else if (!open) {
-      handleClearPatient();
-    }
-     
-  }, [preselectedPatient, open]);
+  // A chosen patient may be missing what WhatsApp bookings never asked.
+  const needsAge = !chosen || !chosen.dateOfBirth;
+  const needsGender = !chosen || !chosen.gender;
 
-  if (!open) return null;
+  // ── Patient lookup ────────────────────────────────────────────────────────
 
-  // ── Patient search debounce ──────────────────────────────────────────────
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const q = e.target.value;
-    setSearchQuery(q);
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    if (!q.trim()) {
-      setSearchResults([]);
+  /** Looks up existing patients as the phone or name is typed. */
+  const lookUp = (value: string, minLength: number) => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    const request = ++searchRequest.current;
+    if (value.trim().replace(/[\s()+-]/g, "").length < minLength) {
+      setMatches([]);
+      setSearching(false);
       return;
     }
-    searchDebounceRef.current = setTimeout(() => {
-      setIsSearching(true);
-      fetch(`/api/patients?search=${encodeURIComponent(q)}`)
-        .then((res) => res.json() as Promise<{ patients: PatientWithStats[] }>)
-        .then(({ patients }) => setSearchResults(patients))
-        .catch(() => setSearchResults([]))
-        .finally(() => setIsSearching(false));
-    }, 300);
+    setSearching(true);
+    searchTimer.current = setTimeout(() => {
+      fetch(`/api/patients?search=${encodeURIComponent(value.trim())}`)
+        .then((res) => res.json() as Promise<{ patients?: PatientWithStats[] }>)
+        .then(({ patients = [] }) => {
+          if (request !== searchRequest.current) return; // a newer search is running
+          // A full phone number that belongs to one patient picks them.
+          const full = normalizePhone(value);
+          const exact = full && patients.find((p) => p.phone === full);
+          if (exact) choosePatient(exact);
+          else setMatches(patients.slice(0, 5));
+        })
+        .catch(() => setMatches([]))
+        .finally(() => {
+          if (request === searchRequest.current) setSearching(false);
+        });
+    }, 250);
   };
 
-  const handleSelectPatient = (patient: PatientWithStats) => {
-    setSelectedPatient(patient);
-    setSearchQuery("");
-    setSearchResults([]);
-    // Pre-fill form fields from existing patient
-    setForm((prev) => ({
-      ...prev,
-      patientName: patient.name,
-      patientPhone: patient.phone,
-      patientEmail: patient.email ?? "",
-      patientDob: patient.dateOfBirth ?? "",
-      patientGender: patient.gender ?? "",
-    }));
+  const choosePatient = (patient: ChosenPatient) => {
+    setChosen(patient);
+    setMatches([]);
     setErrors({});
   };
 
-  // ── Form helpers ──────────────────────────────────────────────────────────
+  const changePatient = () => {
+    setChosen(null);
+    setPhone("");
+    setName("");
+    setMatches([]);
+  };
 
-  const setField =
-    (field: keyof FormState) =>
-    (
-      e: React.ChangeEvent<
-        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-      >,
-    ) => {
-      setForm((prev) => ({ ...prev, [field]: e.target.value }));
-      if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
+  // ── When ──────────────────────────────────────────────────────────────────
 
-      if (field === "appointmentDate") {
-        setForm((prev) => ({ ...prev, appointmentTime: "" }));
-        setLoadingSlots(true);
-        fetch(`/api/availability/slots?date=${e.target.value}`)
-          .then((res) => res.json())
-          .then((data) => {
-            setAvailableSlots((data as { slots?: string[] }).slots ?? []);
-          })
-          .catch(() => setAvailableSlots([]))
-          .finally(() => setLoadingSlots(false));
-      }
-    };
+  const pickDate = (value: string) => {
+    setDate(value);
+    setTime("");
+    setErrors((prev) => ({ ...prev, date: undefined, time: undefined }));
+    if (!value) {
+      setSlots([]);
+      return;
+    }
+    setLoadingSlots(true);
+    fetch(`/api/availability/slots?date=${value}`)
+      .then((res) => res.json() as Promise<{ slots?: string[] }>)
+      .then((data) => setSlots(data.slots ?? []))
+      .catch(() => setSlots([]))
+      .finally(() => setLoadingSlots(false));
+  };
 
-  function validate(): FieldErrors {
+  const pickWhen = (value: When) => {
+    setWhen(value);
+    if (value === "later" && !date) pickDate(today);
+  };
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+
+  function validate() {
     const errs: FieldErrors = {};
-    if (!form.patientName.trim()) errs.patientName = "Name is required.";
-    if (!form.patientPhone.trim()) errs.patientPhone = "Phone is required.";
-    if (!form.appointmentDate) errs.appointmentDate = "Date is required.";
-    if (!form.appointmentTime) errs.appointmentTime = "Time is required.";
+    if (!chosen) {
+      if (!normalizePhone(phone)) errs.phone = "Enter a valid phone number.";
+      if (!name.trim()) errs.name = "Name is required.";
+      if (!age) errs.age = "Age is required.";
+      if (!gender) errs.gender = "Select a gender.";
+    }
+    const years = Number(age);
+    if (age && (!Number.isInteger(years) || years < 0 || years > 120)) {
+      errs.age = "Enter an age between 0 and 120.";
+    }
+    if (when === "later") {
+      if (!date) errs.date = "Pick a date.";
+      else if (!time) errs.time = "Pick a time.";
+    }
     return errs;
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
     const errs = validate();
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
     setServerError(null);
+
+    const patient = {
+      name: chosen ? chosen.name : name.trim(),
+      phone: chosen ? chosen.phone : phone.trim(),
+      // Only what was filled in; an existing patient's details are kept.
+      dateOfBirth: age ? approximateBirthDate(today, Number(age)) : undefined,
+      gender: gender || undefined,
+    };
+
     startTransition(async () => {
       const res = await fetch("/api/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          patient: {
-            name: form.patientName.trim(),
-            phone: form.patientPhone.trim(),
-            email: form.patientEmail.trim() || undefined,
-            dateOfBirth: form.patientDob || undefined,
-            gender: form.patientGender || undefined,
-          },
-          appointmentDate: form.appointmentDate,
-          appointmentTime: form.appointmentTime,
-          reason: form.reason.trim() || undefined,
-          notes: form.notes.trim() || undefined,
+          patient: { ...patient, email: email.trim() || undefined },
+          walkIn: when === "now",
+          appointmentDate: when === "later" ? date : undefined,
+          appointmentTime: when === "later" ? time : undefined,
+          reason: reason.trim() || undefined,
+          notes: notes.trim() || undefined,
           source: "DASHBOARD",
         }),
       });
+      const data = (await res.json().catch(() => null)) as {
+        error?: string;
+        appointment?: { appointmentDate: string; appointmentTime: string };
+        overlaps?: Booked["overlaps"];
+      } | null;
 
-      if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        const msg =
+      if (!res.ok || !data?.appointment) {
+        const message =
           data?.error ?? "Could not create appointment. Please try again.";
-        setServerError(msg);
-        showToast(msg, "error");
+        setServerError(message);
+        showToast(message, "error");
+        if (res.status === 409 && date) pickDate(date); // that slot just went
         return;
       }
 
-      showToast("Appointment booked successfully.");
+      showToast("Appointment booked.");
       router.refresh();
-      setForm(emptyForm);
-      setErrors({});
-      setSelectedPatient(null);
-      setPatientMode("search");
-      setSearchQuery("");
-      onSuccess?.();
-      onClose();
+      if (onSuccess) {
+        onSuccess();
+        onClose();
+        return;
+      }
+      setBooked({
+        name: patient.name,
+        date: data.appointment.appointmentDate,
+        time: data.appointment.appointmentTime,
+        overlaps: data.overlaps ?? [],
+      });
     });
   };
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <>
@@ -261,307 +329,491 @@ export function NewBookingDrawer({
           </button>
         </div>
 
-        {/* Form */}
-        <form
-          onSubmit={handleSubmit}
-          noValidate
-          className="flex flex-1 flex-col overflow-hidden"
-        >
-          <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-            {/* ── Patient ── */}
-            <fieldset>
-              <legend className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">
-                Patient
-              </legend>
+        {booked ? (
+          <BookedView
+            booked={booked}
+            today={today}
+            onDone={onClose}
+            onBookAnother={onBookAnother}
+          />
+        ) : (
+          <form
+            onSubmit={handleSubmit}
+            noValidate
+            className="flex flex-1 flex-col overflow-hidden"
+          >
+            <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+              {/* ── Patient ── */}
+              <fieldset>
+                <legend className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+                  Patient
+                </legend>
 
-              {/* Mode toggle */}
-              <div className="mb-3 flex gap-2">
-                <button
-                  type="button"
-                  disabled={!!preselectedPatient}
-                  onClick={() => {
-                    setPatientMode("search");
-                    handleClearPatient();
-                  }}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                    patientMode === "search"
-                      ? "bg-brand text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  } disabled:opacity-50`}
-                >
-                  Search existing
-                </button>
-                <button
-                  type="button"
-                  disabled={!!preselectedPatient}
-                  onClick={() => {
-                    setPatientMode("new");
-                    handleClearPatient();
-                  }}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                    patientMode === "new"
-                      ? "bg-brand text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  } disabled:opacity-50`}
-                >
-                  + New patient
-                </button>
-              </div>
-
-              {/* Search mode */}
-              {patientMode === "search" && !selectedPatient && (
-                <div className="relative">
-                  <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-                    <Search size={16} className="shrink-0 text-slate-400" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={handleSearchChange}
-                      placeholder="Search by name or phone…"
-                      className="w-full bg-transparent text-sm text-slate-700 outline-none"
-                    />
-                  </label>
-                  {(searchResults.length > 0 || isSearching) && (
-                    <div className="absolute z-10 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg">
-                      {isSearching && (
-                        <p className="px-4 py-3 text-xs text-slate-400">
-                          Searching…
-                        </p>
-                      )}
-                      {!isSearching &&
-                        searchResults.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => handleSelectPatient(p)}
-                            className="flex w-full flex-col gap-0.5 px-4 py-3 text-left text-sm hover:bg-slate-50 first:rounded-t-xl last:rounded-b-xl"
-                          >
-                            <span className="font-semibold text-slate-700">
-                              {p.name}
-                            </span>
-                            <span className="text-xs text-slate-400">
-                              {formatPhone(p.phone)}
-                            </span>
-                          </button>
-                        ))}
-                      {!isSearching &&
-                        searchResults.length === 0 &&
-                        searchQuery.trim() && (
-                          <p className="px-4 py-3 text-xs text-slate-400">
-                            No patients found.
-                          </p>
-                        )}
+                {chosen ? (
+                  <div className="flex items-start justify-between rounded-xl border border-teal-100 bg-teal-50 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {chosen.name}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {patientDetails(chosen)}
+                      </p>
                     </div>
-                  )}
-                  <p className="mt-2 text-xs text-slate-400">
-                    Or switch to &quot;+ New patient&quot; to register a
-                    walk-in.
-                  </p>
-                </div>
-              )}
-
-              {/* Selected patient card */}
-              {patientMode === "search" && selectedPatient && (
-                <div className="flex items-start justify-between rounded-xl border border-teal-100 bg-teal-50 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-700">
-                      {selectedPatient.name}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {formatPhone(selectedPatient.phone)}
-                    </p>
+                    {!preselectedPatient && (
+                      <button
+                        type="button"
+                        onClick={changePatient}
+                        className="ml-3 text-xs font-semibold text-rose-500 hover:underline"
+                      >
+                        Change
+                      </button>
+                    )}
                   </div>
-                  {!preselectedPatient && (
-                    <button
-                      type="button"
-                      onClick={handleClearPatient}
-                      className="ml-3 text-xs font-semibold text-rose-500 hover:underline"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* New patient fields OR hidden pre-filled fields for search */}
-              {(patientMode === "new" || selectedPatient) && (
-                <div className="mt-3 space-y-3">
-                  <FormField label="Full name *" error={errors.patientName}>
-                    <input
-                      type="text"
-                      value={form.patientName}
-                      onChange={setField("patientName")}
-                      placeholder="e.g. Aarav Mehta"
-                      className={inputCls(!!errors.patientName)}
-                      autoComplete="name"
-                      readOnly={!!selectedPatient}
-                    />
-                  </FormField>
-
-                  <FormField label="Phone *" error={errors.patientPhone}>
-                    <input
-                      type="tel"
-                      value={form.patientPhone}
-                      onChange={setField("patientPhone")}
-                      placeholder="e.g. 9876543210"
-                      className={inputCls(!!errors.patientPhone)}
-                      autoComplete="tel"
-                      readOnly={!!selectedPatient}
-                    />
-                  </FormField>
-
-                  <FormField label="Email">
-                    <input
-                      type="email"
-                      value={form.patientEmail}
-                      onChange={setField("patientEmail")}
-                      placeholder="optional"
-                      className={inputCls(false)}
-                      autoComplete="email"
-                    />
-                  </FormField>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <FormField label="Date of birth">
+                ) : (
+                  <div className="space-y-3">
+                    <FormField label="Phone *" htmlFor="booking-phone" error={errors.phone}>
                       <input
-                        type="date"
-                        value={form.patientDob}
-                        onChange={setField("patientDob")}
-                        className={inputCls(false)}
+                        id="booking-phone"
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => {
+                          setPhone(e.target.value);
+                          setErrors((prev) => ({ ...prev, phone: undefined }));
+                          lookUp(e.target.value, 4);
+                        }}
+                        placeholder="e.g. 98765 43210"
+                        className={inputCls(!!errors.phone)}
+                        autoComplete="off"
+                        autoFocus
                       />
                     </FormField>
 
-                    <FormField label="Gender">
-                      <select
-                        value={form.patientGender}
-                        onChange={setField("patientGender")}
-                        className={inputCls(false)}
-                      >
-                        <option value="">Select…</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                      </select>
+                    <FormField label="Full name *" htmlFor="booking-name" error={errors.name}>
+                      <input
+                        id="booking-name"
+                        type="text"
+                        value={name}
+                        onChange={(e) => {
+                          setName(e.target.value);
+                          setErrors((prev) => ({ ...prev, name: undefined }));
+                          lookUp(e.target.value, 2);
+                        }}
+                        placeholder="e.g. Aarav Mehta"
+                        className={inputCls(!!errors.name)}
+                        autoComplete="off"
+                      />
                     </FormField>
-                  </div>
-                </div>
-              )}
-            </fieldset>
 
-            {/* ── Appointment ── */}
-            <fieldset>
-              <legend className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">
-                Appointment
-              </legend>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField label="Date *" error={errors.appointmentDate}>
+                    {searching && (
+                      <p className="text-xs text-slate-400">Searching…</p>
+                    )}
+
+                    {!searching && matches.length > 0 && (
+                      <div>
+                        <p className="mb-1.5 text-xs font-semibold text-slate-500">
+                          Already a patient? Tap to use their details
+                        </p>
+                        <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+                          {matches.map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => choosePatient(p)}
+                              className="flex w-full flex-col gap-0.5 px-4 py-3 text-left text-sm hover:bg-slate-50 first:rounded-t-xl last:rounded-b-xl"
+                            >
+                              <span className="font-semibold text-slate-700">
+                                {p.name}
+                              </span>
+                              <span className="text-xs text-slate-400">
+                                {patientDetails(p)}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {(needsAge || needsGender) && (
+                  <div className="mt-3 grid grid-cols-3 gap-3">
+                    {needsAge && (
+                      <FormField
+                        label={chosen ? "Age" : "Age *"}
+                        htmlFor="booking-age"
+                        error={errors.age}
+                      >
+                        <input
+                          id="booking-age"
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          max={120}
+                          value={age}
+                          onChange={(e) => {
+                            setAge(e.target.value);
+                            setErrors((prev) => ({ ...prev, age: undefined }));
+                          }}
+                          placeholder="yrs"
+                          className={inputCls(!!errors.age)}
+                        />
+                      </FormField>
+                    )}
+                    {needsGender && (
+                      <div className="col-span-2">
+                        <FormField
+                          label={chosen ? "Gender" : "Gender *"}
+                          error={errors.gender}
+                        >
+                          <div className="flex gap-2 pt-1">
+                            {GENDERS.map((g) => (
+                              <Chip
+                                key={g}
+                                selected={gender === g}
+                                onClick={() => {
+                                  setGender(gender === g ? "" : g);
+                                  setErrors((prev) => ({ ...prev, gender: undefined }));
+                                }}
+                              >
+                                {g}
+                              </Chip>
+                            ))}
+                          </div>
+                        </FormField>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </fieldset>
+
+              {/* ── When ── */}
+              <fieldset>
+                <legend className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+                  When
+                </legend>
+                <div className="flex gap-2">
+                  <Chip selected={when === "now"} onClick={() => pickWhen("now")}>
+                    Now (walk-in)
+                  </Chip>
+                  <Chip selected={when === "later"} onClick={() => pickWhen("later")}>
+                    Later
+                  </Chip>
+                </div>
+
+                {when === "now" ? (
+                  <p className="mt-2 text-xs text-slate-400">
+                    Booked for today at the current time, even outside your slots.
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    <FormField label="Date *" htmlFor="booking-date" error={errors.date}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Chip selected={date === today} onClick={() => pickDate(today)}>
+                          Today
+                        </Chip>
+                        <Chip selected={date === tomorrow} onClick={() => pickDate(tomorrow)}>
+                          Tomorrow
+                        </Chip>
+                        <div className="min-w-0 flex-1">
+                          <input
+                            id="booking-date"
+                            type="date"
+                            min={today}
+                            value={date}
+                            onChange={(e) => pickDate(e.target.value)}
+                            className={inputCls(!!errors.date)}
+                          />
+                        </div>
+                      </div>
+                    </FormField>
+
+                    {date && (
+                      <FormField label="Time *" error={errors.time}>
+                        {loadingSlots ? (
+                          <p className="text-xs text-slate-400">Loading times…</p>
+                        ) : slots.length === 0 ? (
+                          <p className="text-xs text-slate-400">
+                            No free times on this day.
+                          </p>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                            {slots.map((slot) => (
+                              <Chip
+                                key={slot}
+                                selected={time === slot}
+                                onClick={() => {
+                                  setTime(slot);
+                                  setErrors((prev) => ({ ...prev, time: undefined }));
+                                }}
+                              >
+                                {formatTime(slot)}
+                              </Chip>
+                            ))}
+                          </div>
+                        )}
+                      </FormField>
+                    )}
+                  </div>
+                )}
+              </fieldset>
+
+              {/* ── Visit ── */}
+              <fieldset>
+                <legend className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+                  Visit
+                </legend>
+                <div className="space-y-3">
+                  <FormField label="Reason" htmlFor="booking-reason">
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      {REASONS.map((r) => (
+                        <Chip
+                          key={r}
+                          selected={reason === r}
+                          onClick={() => setReason(reason === r ? "" : r)}
+                        >
+                          {r}
+                        </Chip>
+                      ))}
+                    </div>
                     <input
-                      type="date"
-                      value={form.appointmentDate}
-                      onChange={setField("appointmentDate")}
-                      className={inputCls(!!errors.appointmentDate)}
+                      id="booking-reason"
+                      type="text"
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="or type a reason"
+                      className={inputCls(false)}
                     />
                   </FormField>
 
-                  <FormField label="Time *" error={errors.appointmentTime}>
-                    <select
-                      value={form.appointmentTime}
-                      onChange={setField("appointmentTime")}
-                      className={inputCls(!!errors.appointmentTime)}
-                      disabled={!form.appointmentDate || loadingSlots}
-                    >
-                      <option value="">
-                        {loadingSlots ? "Loading..." : "Select time"}
-                      </option>
-                      {availableSlots.map((slot) => (
-                        <option key={slot} value={slot}>
-                          {slot}
-                        </option>
-                      ))}
-                    </select>
-                  </FormField>
+                  <button
+                    type="button"
+                    onClick={() => setShowMore((value) => !value)}
+                    aria-expanded={showMore}
+                    className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-brand"
+                  >
+                    More details
+                    <ChevronDown
+                      size={14}
+                      className={`transition ${showMore ? "rotate-180" : ""}`}
+                    />
+                  </button>
+
+                  {showMore && (
+                    <>
+                      <FormField label="Email" htmlFor="booking-email">
+                        <input
+                          id="booking-email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="optional"
+                          className={inputCls(false)}
+                          autoComplete="off"
+                        />
+                      </FormField>
+                      <FormField label="Notes" htmlFor="booking-notes">
+                        <textarea
+                          id="booking-notes"
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                          placeholder="Additional notes…"
+                          rows={3}
+                          className={`${inputCls(false)} resize-none`}
+                        />
+                      </FormField>
+                    </>
+                  )}
                 </div>
+              </fieldset>
 
-                <FormField label="Reason">
-                  <input
-                    type="text"
-                    value={form.reason}
-                    onChange={setField("reason")}
-                    placeholder="e.g. General consultation"
-                    className={inputCls(false)}
-                  />
-                </FormField>
-
-                <FormField label="Notes">
-                  <textarea
-                    value={form.notes}
-                    onChange={setField("notes")}
-                    placeholder="Additional notes…"
-                    rows={3}
-                    className={`${inputCls(false)} resize-none`}
-                  />
-                </FormField>
-              </div>
-            </fieldset>
-
-            {serverError && (
-              <p
-                role="alert"
-                className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600"
-              >
-                {serverError}
-              </p>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="border-t border-slate-100 px-6 py-4">
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isPending}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-60"
-              >
-                {isPending ? "Booking…" : "Book appointment"}
-              </button>
+              {serverError && (
+                <p
+                  role="alert"
+                  className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600"
+                >
+                  {serverError}
+                </p>
+              )}
             </div>
-          </div>
-        </form>
+
+            {/* Footer */}
+            <div className="border-t border-slate-100 px-6 py-4">
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-60"
+                >
+                  {isPending
+                    ? "Booking…"
+                    : when === "now"
+                      ? "Book now"
+                      : "Book appointment"}
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
       </aside>
     </>
   );
 }
 
+// ─── Booked ───────────────────────────────────────────────────────────────────
+
+function BookedView({
+  booked,
+  today,
+  onDone,
+  onBookAnother,
+}: {
+  booked: Booked;
+  today: string;
+  onDone: () => void;
+  onBookAnother: () => void;
+}) {
+  const day = booked.date === today ? "Today" : formatDate(booked.date);
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+        <div className="flex items-start gap-3 rounded-xl border border-teal-100 bg-teal-50 px-4 py-3">
+          <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-brand" />
+          <div>
+            <p className="text-sm font-semibold text-slate-700">
+              Booked: {booked.name}
+            </p>
+            <p className="text-xs text-slate-500">
+              {day} at {formatTime(booked.time)} · Confirmed
+            </p>
+          </div>
+        </div>
+
+        {booked.overlaps.length > 0 && (
+          <div className="flex items-start gap-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+            <p>
+              Also booked around this time:{" "}
+              {booked.overlaps
+                .map((o) => `${o.name} at ${formatTime(o.time)}`)
+                .join(", ")}
+              .
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-slate-100 px-6 py-4">
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onDone}
+            className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            Done
+          </button>
+          <button
+            type="button"
+            onClick={onBookAnother}
+            autoFocus
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white hover:bg-teal-800"
+          >
+            Book another
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** "+91 98765 43210 · 34 yrs · Male", leaving out what is unknown. */
+function patientDetails(p: Pick<ChosenPatient, "phone" | "dateOfBirth" | "gender">) {
+  const years = deriveAge(p.dateOfBirth);
+  return [formatPhone(p.phone), years > 0 ? `${years} yrs` : null, p.gender]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** Today's date `years` ago: an approximate birth date from a stated age. */
+function approximateBirthDate(today: string, years: number) {
+  const [y, m, d] = today.split("-");
+  const day = m === "02" && d === "29" ? "28" : d;
+  return `${String(Number(y) - years).padStart(4, "0")}-${m}-${day}`;
+}
 
 const inputCls = (hasError: boolean) =>
   `w-full rounded-xl border px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-brand/30 ${
     hasError ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-white"
   }`;
 
+function Chip({
+  selected,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+        selected
+          ? "bg-brand text-white"
+          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * A labelled field. With `htmlFor` the label names one input; without it,
+ * the label names the group of buttons inside (gender, time slots).
+ */
 function FormField({
   label,
+  htmlFor,
   error,
   children,
 }: {
   label: string;
+  htmlFor?: string;
   error?: string;
   children: React.ReactNode;
 }) {
+  const groupLabelId = useId();
+  const labelCls = "mb-1.5 block text-xs font-semibold text-slate-500";
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-semibold text-slate-500">
-        {label}
-      </label>
-      {children}
+      {htmlFor ? (
+        <label htmlFor={htmlFor} className={labelCls}>
+          {label}
+        </label>
+      ) : (
+        <span id={groupLabelId} className={labelCls}>
+          {label}
+        </span>
+      )}
+      {htmlFor ? (
+        children
+      ) : (
+        <div role="group" aria-labelledby={groupLabelId}>
+          {children}
+        </div>
+      )}
       {error && <p className="mt-1 text-xs text-rose-500">{error}</p>}
     </div>
   );

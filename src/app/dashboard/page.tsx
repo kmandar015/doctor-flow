@@ -6,6 +6,7 @@ import { getDoctorById } from "@/lib/database/doctors";
 import { getAppointmentStats, getPatientStats, getFollowUpStats } from "@/lib/database/reports";
 import { toUiAppointment } from "@/lib/appointments/view-models";
 import Link from "next/link";
+import { NewBookingButton } from "../components/NewBookingLauncher";
 import { DashboardAppointmentsSection } from "./components/DashboardAppointmentsSection";
 import { PendingRequests } from "./components/PendingRequests";
 import { StatsCards } from "./components/StatsCards";
@@ -105,14 +106,17 @@ export default async function DashboardPage() {
             Here&apos;s a quick overview of your practice today.
           </p>
         </div>
-        <Link
-          href="/calendar"
-          className="inline-flex w-fit items-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
-        >
-          <CalendarDays size={18} />
-          View calendar
-          <ChevronRight size={16} />
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/calendar"
+            className="inline-flex w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            <CalendarDays size={18} />
+            View calendar
+            <ChevronRight size={16} />
+          </Link>
+          <NewBookingButton />
+        </div>
       </div>
       <AutoRefresh />
 

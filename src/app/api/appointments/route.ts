@@ -3,8 +3,12 @@ import { getCurrentDoctorId } from "@/lib/database/auth";
 import { normalizePhone } from "@/lib/phone";
 import {
   createAppointment,
+  findNearbyAppointments,
   listAppointments,
 } from "@/lib/database/appointments";
+import { getDoctorAvailability } from "@/lib/database/availability";
+import { currentTimeHHMM, todayISO } from "@/lib/dates";
+import { notifyBookedByClinic } from "@/lib/whatsapp/notify";
 import {
   appointmentSources,
   appointmentStatuses,
@@ -70,8 +74,15 @@ export async function POST(request: NextRequest) {
     reason?: unknown;
     notes?: unknown;
     source?: unknown;
+    walkIn?: unknown;
   };
   const patient = input.patient;
+  // A walk-in is booked at the clinic's current date and time.
+  const walkIn = input.walkIn === true;
+  if (walkIn) {
+    input.appointmentDate = todayISO();
+    input.appointmentTime = currentTimeHHMM();
+  }
   if (
     !patient ||
     typeof patient.name !== "string" ||
@@ -95,8 +106,10 @@ export async function POST(request: NextRequest) {
   }
   const text = (value: unknown) =>
     typeof value === "string" ? value.trim() || undefined : undefined;
+  const source = (input.source as AppointmentSource | undefined) ?? "MANUAL";
   try {
-    const appointment = createAppointment((await getCurrentDoctorId()), {
+    const doctorId = await getCurrentDoctorId();
+    const appointment = createAppointment(doctorId, {
       patient: {
         name: patient.name.trim(),
         phone: normalizePhone(patient.phone)!,
@@ -108,9 +121,24 @@ export async function POST(request: NextRequest) {
       appointmentTime: input.appointmentTime,
       reason: text(input.reason),
       notes: text(input.notes),
-      source: input.source as AppointmentSource | undefined,
+      source,
+      // The doctor booked it, so there is nothing left to accept.
+      status: source === "WHATSAPP" ? "PENDING" : "CONFIRMED",
+      walkIn,
     });
-    return NextResponse.json({ appointment }, { status: 201 });
+    const overlaps = walkIn
+      ? findNearbyAppointments(
+          doctorId,
+          appointment.appointmentDate,
+          appointment.appointmentTime,
+          getDoctorAvailability(doctorId)?.slotDuration ?? 30,
+          appointment.id,
+        )
+      : [];
+    if (appointment.status === "CONFIRMED") {
+      await notifyBookedByClinic(appointment, { walkIn });
+    }
+    return NextResponse.json({ appointment, overlaps }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof Error) {
       if (error.message === "CONFLICT") {

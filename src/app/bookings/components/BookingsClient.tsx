@@ -1,16 +1,11 @@
 "use client";
 
-import {
-  CalendarDays,
-  CalendarPlus,
-  MoreHorizontal,
-  Search,
-} from "lucide-react";
+import { CalendarDays, MoreHorizontal, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { UiAppointment } from "@/lib/appointments/view-models";
 import { AppointmentAvatar } from "../../dashboard/components/AppointmentAvatar";
 import { AppointmentDetail } from "../../components/AppointmentDetail";
-import { NewBookingDrawer } from "../../components/NewBookingDrawer";
+import { NewBookingButton } from "../../components/NewBookingLauncher";
 import { SourceBadge } from "../../components/SourceBadge";
 
 // ─── Filter options ───────────────────────────────────────────────────────────
@@ -52,7 +47,6 @@ export function BookingsClient({
   );
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [newBookingOpen, setNewBookingOpen] = useState(false);
 
   const visible = useMemo(
     () =>
@@ -97,13 +91,7 @@ export function BookingsClient({
             />
           </label>
 
-          <button
-            onClick={() => setNewBookingOpen(true)}
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white hover:bg-teal-800"
-          >
-            <CalendarPlus size={18} />
-            <span className="hidden sm:inline">New booking</span>
-          </button>
+          <NewBookingButton />
         </div>
       </div>
 
@@ -187,10 +175,6 @@ export function BookingsClient({
       <AppointmentDetail
         appointmentId={selectedId}
         onClose={() => setSelectedId(null)}
-      />
-      <NewBookingDrawer
-        open={newBookingOpen}
-        onClose={() => setNewBookingOpen(false)}
       />
     </>
   );

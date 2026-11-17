@@ -5,6 +5,7 @@ import { getDoctorById } from "@/lib/database/doctors";
 import type { Appointment, FollowUp, Patient } from "@/lib/database/types";
 import { addDaysISO, isPastSlot, todayISO } from "@/lib/dates";
 import { sendWhatsAppText } from "./client";
+import { getWhatsAppConfig } from "./config";
 import { friendlyDate, friendlyTime } from "./text";
 
 /**
@@ -77,6 +78,44 @@ export async function notifyFollowUpScheduled(followUp: FollowUp) {
       allowTemplateFallback: true,
     },
   );
+}
+
+/**
+ * Whether a message the clinic starts can reach this patient: always in the
+ * demo, with an approved template, or within 24 hours of their last message
+ * (WhatsApp rejects free text outside that window).
+ */
+function canReachPatient(doctorId: string, phone: string) {
+  const config = getWhatsAppConfig();
+  if (config.mode === "simulated" || config.reminderTemplate) return true;
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  return !!getDatabase()
+    .prepare(
+      "SELECT 1 FROM whatsapp_messages WHERE doctor_id = ? AND phone = ? AND direction = 'IN' AND created_at >= ? LIMIT 1",
+    )
+    .get(doctorId, phone, since);
+}
+
+/**
+ * Confirmation for a booking the doctor made at the desk. Skipped quietly
+ * when WhatsApp would refuse it, so nothing fails in the message log.
+ */
+export async function notifyBookedByClinic(
+  appointment: Appointment,
+  { walkIn }: { walkIn: boolean },
+) {
+  const doctorId = appointment.doctorId;
+  if (!canReachPatient(doctorId, appointment.patient.phone)) return;
+  const by = signature(doctorId);
+  const body = walkIn
+    ? `✅ *You're checked in* with ${by}.\n\nSave this number: you can book your next visit and get reminders right here. Reply *Hi* any time.`
+    : `✅ *Appointment booked*\n\n📅 ${when(appointment)}\n👩‍⚕️ ${by}\n\nPlease arrive 10 minutes early. Reply *4* if you need to cancel.`;
+  await sendWhatsAppText(appointment.patient.phone, body, {
+    doctorId,
+    kind: "APPOINTMENT_CONFIRMED",
+    appointmentId: appointment.id,
+    allowTemplateFallback: true,
+  });
 }
 
 export async function notifyWelcome(patient: Patient) {

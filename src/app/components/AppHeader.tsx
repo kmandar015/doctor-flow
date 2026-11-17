@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { FrameDoctor } from "./AppFrame";
+import { NewBookingButton } from "./NewBookingLauncher";
 
 export function AppHeader({ doctor }: { doctor: FrameDoctor }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -39,6 +40,8 @@ export function AppHeader({ doctor }: { doctor: FrameDoctor }) {
   return (
     <header className="sticky top-0 z-30 flex h-[78px] items-center justify-end border-b border-slate-200/80 bg-white/90 px-5 backdrop-blur md:px-8">
       <div className="flex items-center gap-3 sm:gap-5">
+        <NewBookingButton />
+        <div className="hidden h-8 w-px bg-slate-200 sm:block" />
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen((open) => !open)}

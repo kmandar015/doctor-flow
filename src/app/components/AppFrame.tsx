@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { AppHeader } from "./AppHeader";
+import { NewBookingProvider } from "./NewBookingLauncher";
 import { Sidebar } from "./Sidebar";
 
 export type FrameDoctor = {
@@ -26,11 +27,11 @@ export function AppFrame({
 
   if (BARE_ROUTES.has(pathname) || !doctor) return <>{children}</>;
 
-  return <>
+  return <NewBookingProvider>
     <Sidebar doctor={doctor} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
     <div className={`min-h-screen bg-mist transition-[padding] duration-300 ${collapsed ? "md:pl-[86px]" : "md:pl-[270px]"}`}>
       <AppHeader doctor={doctor} />
       {children}
     </div>
-  </>;
+  </NewBookingProvider>;
 }

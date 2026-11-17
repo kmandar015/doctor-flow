@@ -108,22 +108,31 @@ type CreateAppointmentInput = {
   reason?: string;
   notes?: string;
   source?: AppointmentSource;
+  /** PENDING for patient requests; bookings the doctor makes start CONFIRMED. */
+  status?: Extract<AppointmentStatus, "PENDING" | "CONFIRMED">;
+  /**
+   * A patient at the clinic right now: booked at the current time, outside
+   * the slot grid, even during a break or over another booking.
+   */
+  walkIn?: boolean;
 };
 
 export function createAppointment(
   doctorId: string,
   input: CreateAppointmentInput,
 ) {
-  const slotStatus = checkSlot(
-    doctorId,
-    input.appointmentDate,
-    input.appointmentTime,
-  );
-  if (slotStatus !== "AVAILABLE") {
-    throw new Error(slotStatus);
-  }
-  if (hasConflict(doctorId, input.appointmentDate, input.appointmentTime)) {
-    throw new Error("CONFLICT");
+  if (!input.walkIn) {
+    const slotStatus = checkSlot(
+      doctorId,
+      input.appointmentDate,
+      input.appointmentTime,
+    );
+    if (slotStatus !== "AVAILABLE") {
+      throw new Error(slotStatus);
+    }
+    if (hasConflict(doctorId, input.appointmentDate, input.appointmentTime)) {
+      throw new Error("CONFLICT");
+    }
   }
   const db = getDatabase();
   const now = new Date().toISOString();
@@ -163,7 +172,7 @@ export function createAppointment(
   }
   const id = randomUUID();
   db.prepare(
-    "INSERT INTO appointments (id, doctor_id, patient_id, appointment_date, appointment_time, reason, notes, status, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?)",
+    "INSERT INTO appointments (id, doctor_id, patient_id, appointment_date, appointment_time, reason, notes, status, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     id,
     doctorId,
@@ -172,6 +181,7 @@ export function createAppointment(
     input.appointmentTime,
     input.reason ?? null,
     input.notes ?? null,
+    input.status ?? "PENDING",
     input.source ?? "MANUAL",
     now,
     now,
@@ -208,6 +218,35 @@ export function updateAppointmentStatus(
     kind: "updated" as const,
     appointment: getAppointment(doctorId, id)!,
   };
+}
+
+/**
+ * Active appointments on `date` within `minutes` of `time`, other than
+ * `excludeId`. Used to warn when a walk-in lands on someone's slot.
+ */
+export function findNearbyAppointments(
+  doctorId: string,
+  date: string,
+  time: string,
+  minutes: number,
+  excludeId?: string,
+) {
+  const toMinutes = (hhmm: string) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const at = toMinutes(time);
+  const rows = getDatabase()
+    .prepare(
+      `SELECT a.id, a.appointment_time AS time, p.name AS name FROM appointments a
+       JOIN patients p ON p.id = a.patient_id AND p.doctor_id = a.doctor_id
+       WHERE a.doctor_id = ? AND a.appointment_date = ? AND a.status IN ('PENDING', 'CONFIRMED')
+       ORDER BY a.appointment_time`,
+    )
+    .all(doctorId, date) as Array<{ id: string; time: string; name: string }>;
+  return rows
+    .filter((row) => row.id !== excludeId && Math.abs(toMinutes(row.time) - at) < minutes)
+    .map(({ time: t, name }) => ({ time: t, name }));
 }
 
 export function hasConflict(
