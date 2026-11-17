@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
 
   if (config.appSecret) {
     if (!hasValidSignature(rawBody, request.headers.get("x-hub-signature-256"), config.appSecret)) {
+      console.warn("WhatsApp webhook rejected: signature does not match WHATSAPP_APP_SECRET.");
       return NextResponse.json({ error: "Invalid signature." }, { status: 401 });
     }
   } else if (process.env.NODE_ENV === "production") {
