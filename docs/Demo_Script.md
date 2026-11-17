@@ -39,8 +39,9 @@ Within 15 seconds the request appears under **Pending requests** with a green
   overdue and today.
 
 **5. Automatic reminders (1 min).**
-Dashboard → **Send reminders**. Tomorrow's confirmed visits and due follow-ups get a
-WhatsApp reminder. In production this runs every hour by itself.
+Tomorrow's confirmed visits and due follow-ups get a WhatsApp reminder from the hourly
+job. To trigger it during the demo, call it with the `CRON_SECRET` from `.env.local`:
+`curl -H "Authorization: Bearer <CRON_SECRET>" http://localhost:3000/api/cron/reminders`.
 
 **6. Patient self-service (2 min).**
 On the phone: `2` (my appointments), `3` (my follow-ups), `4` (cancel). The cancellation

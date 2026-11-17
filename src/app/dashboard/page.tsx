@@ -11,7 +11,6 @@ import { PendingRequests } from "./components/PendingRequests";
 import { StatsCards } from "./components/StatsCards";
 import { FollowUpSummary } from "./components/FollowUpSummary";
 import { ReportSummary } from "./components/ReportSummary";
-import { SendRemindersButton } from "./components/SendRemindersButton";
 import { AutoRefresh } from "@/app/components/AutoRefresh";
 import type { Stat } from "./types";
 import { listFollowUps } from "@/lib/database/followUps";
@@ -106,8 +105,6 @@ export default async function DashboardPage() {
             Here&apos;s a quick overview of your practice today.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-        <SendRemindersButton />
         <Link
           href="/calendar"
           className="inline-flex w-fit items-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800"
@@ -116,7 +113,6 @@ export default async function DashboardPage() {
           View calendar
           <ChevronRight size={16} />
         </Link>
-        </div>
       </div>
       <AutoRefresh />
 
